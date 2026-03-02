@@ -1,0 +1,44 @@
+plant:
+  name: "Tulip Factory Floor"
+  location: "Building 4, Floor 2"
+
+lines:
+  - id: "L1"
+    name: "Precision Machining"
+    machines:
+      - { id: "MILL-L1-01", type: "mill" }
+      - { id: "LATHE-L1-02", type: "lathe" }
+      - { id: "LATHE-L1-03", type: "lathe" }
+      - { id: "GRND-L1-04", type: "grinder" }
+
+  - id: "L2"
+    name: "Heavy Fabrication"
+    machines:
+      - { id: "GRND-L2-01", type: "grinder" }
+      - { id: "MILL-L2-02", type: "mill" }
+      - { id: "PRESS-L2-03", type: "press" }
+      - { id: "DRILL-L2-04", type: "drill" }
+
+  - id: "L3"
+    name: "CNC Assembly"
+    machines:
+      - { id: "CNC-L3-01", type: "cnc" }
+      - { id: "CNC-L3-02", type: "cnc" }
+      - { id: "MILL-L3-03", type: "mill" }
+      - { id: "LATHE-L3-04", type: "lathe" }
+      - { id: "CONV-L3-05", type: "conveyor" }
+
+simulation:
+  tick_rate_hz: 1
+  fault_probability_base: 0.0008
+
+mqtt:
+  host: "localhost"
+  port: 1883
+
+opcua:
+  endpoint: "opc.tcp://0.0.0.0:4840/factory/"
+
+server:
+  host: "0.0.0.0"
+  port: 3000

@@ -1,0 +1,12 @@
+{
+    "name": "acme-factory-edge",
+    "description": "Node-RED edge device for ACME Factory simulation",
+    "version": "1.0.0",
+    "private": true,
+    "dependencies": {
+        "@flowfuse/node-red-dashboard": "~1.30.2",
+        "@tulip/node-red-tulip-api": "~0.3.1",
+        "node-red-contrib-opcua": "0.2.333",
+        "node-red-dashboard": "3.6.5"
+    }
+}

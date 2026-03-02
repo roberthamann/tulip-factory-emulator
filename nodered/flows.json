@@ -1,0 +1,704 @@
+[
+    {
+        "id": "eio_tab",
+        "type": "tab",
+        "label": "Edge IO → Tulip",
+        "disabled": false
+    },
+    {
+        "id": "mqtt_broker_local",
+        "type": "mqtt-broker",
+        "name": "Local Mosquitto",
+        "broker": "mosquitto",
+        "port": "1883",
+        "clientid": "nodered-edge-device",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "nodered/status",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "online",
+        "birthMsg": {},
+        "closeTopic": "nodered/status",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "offline",
+        "closeMsg": {},
+        "willTopic": "nodered/status",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "lost",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ui_group_summary",
+        "type": "ui_group",
+        "name": "Plant Summary",
+        "tab": "ui_tab_main",
+        "order": 1,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_trends",
+        "type": "ui_group",
+        "name": "Trends",
+        "tab": "ui_tab_main",
+        "order": 2,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_alerts",
+        "type": "ui_group",
+        "name": "Alerts",
+        "tab": "ui_tab_main",
+        "order": 3,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_tab_main",
+        "type": "ui_tab",
+        "name": "Factory Floor",
+        "icon": "dashboard",
+        "order": 1,
+        "disp": true
+    },
+    {
+        "id": "mqtt_broker",
+        "type": "mqtt-broker",
+        "name": "Factory MQTT",
+        "broker": "host.docker.internal",
+        "port": "1883",
+        "clientid": "nodered-edgeio",
+        "autoConnect": true,
+        "keepalive": "60",
+        "cleansession": true
+    },
+    {
+        "id": "eio_dashboard",
+        "type": "ui_group",
+        "name": "Edge IO — Sensors",
+        "tab": "eio_ui_tab",
+        "order": 1,
+        "disp": true,
+        "width": 12
+    },
+    {
+        "id": "eio_controls",
+        "type": "ui_group",
+        "name": "Edge IO — Controls",
+        "tab": "eio_ui_tab",
+        "order": 2,
+        "disp": true,
+        "width": 12
+    },
+    {
+        "id": "eio_gpio",
+        "type": "ui_group",
+        "name": "Edge IO — GPIO",
+        "tab": "eio_ui_tab",
+        "order": 3,
+        "disp": true,
+        "width": 12
+    },
+    {
+        "id": "eio_ui_tab",
+        "type": "ui_tab",
+        "name": "Edge IO",
+        "icon": "dashboard",
+        "order": 1
+    },
+    {
+        "id": "da98853b01b6fb15",
+        "type": "ui_group",
+        "name": "Edge IO — Sensors",
+        "tab": "eio_ui_tab",
+        "order": 1,
+        "disp": true,
+        "width": 12
+    },
+    {
+        "id": "7776ba1f3758714b",
+        "type": "ui_group",
+        "name": "Edge IO — Controls",
+        "tab": "eio_ui_tab",
+        "order": 2,
+        "disp": true,
+        "width": 12
+    },
+    {
+        "id": "f8f521ac9f2b3041",
+        "type": "ui_group",
+        "name": "Edge IO — GPIO",
+        "tab": "eio_ui_tab",
+        "order": 3,
+        "disp": true,
+        "width": 12
+    },
+    {
+        "id": "2600b526f0e14445",
+        "type": "ui_tab",
+        "name": "Edge IO",
+        "icon": "dashboard",
+        "order": 1
+    },
+    {
+        "id": "e0406886e58b585d",
+        "type": "ui-base",
+        "name": "Edge IO Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification"
+        ],
+        "showPathInSidebar": false
+    },
+    {
+        "id": "ad2b6109ff2a305c",
+        "type": "ui-page",
+        "name": "Edge IO",
+        "ui": "e0406886e58b585d",
+        "path": "/edge-io",
+        "icon": "mdi-chip",
+        "layout": "grid",
+        "theme": "18791ca5ed724194",
+        "order": 1
+    },
+    {
+        "id": "18791ca5ed724194",
+        "type": "ui-theme",
+        "name": "Factory Dark",
+        "colors": {
+            "surface": "#1a1a2e",
+            "primary": "#00ff66",
+            "bgPage": "#16213e",
+            "groupBg": "#0f3460",
+            "groupOutline": "#1a1a6e"
+        },
+        "sizes": {
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "8px",
+            "widgetGap": "6px"
+        }
+    },
+    {
+        "id": "fc9fa185f89edbf6",
+        "type": "ui-group",
+        "name": "Sensors",
+        "page": "ad2b6109ff2a305c",
+        "width": 6,
+        "height": 1,
+        "order": 1
+    },
+    {
+        "id": "b7f32b4d1eb2712e",
+        "type": "ui-group",
+        "name": "Controls",
+        "page": "ad2b6109ff2a305c",
+        "width": 6,
+        "height": 1,
+        "order": 2
+    },
+    {
+        "id": "34a4e524caa4afc0",
+        "type": "ui-group",
+        "name": "GPIO",
+        "page": "ad2b6109ff2a305c",
+        "width": 6,
+        "height": 1,
+        "order": 3
+    },
+    {
+        "id": "a20f8fb9c956fe1a",
+        "type": "ui-group",
+        "name": "Event Log",
+        "page": "ad2b6109ff2a305c",
+        "width": 12,
+        "height": 1,
+        "order": 4
+    },
+    {
+        "id": "c1",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "═══ EDGE IO → TULIP MACHINE ATTRIBUTES ═══",
+        "x": 250,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "c1a",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "MQTT from Edge IO sim → Parse → Tulip Machine Attribute nodes",
+        "x": 270,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "mqtt_status",
+        "type": "mqtt in",
+        "z": "eio_tab",
+        "name": "EIO-01 Status",
+        "topic": "factory/edge-io/EIO-01/status",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "mqtt_broker",
+        "inputs": 0,
+        "x": 150,
+        "y": 140,
+        "wires": [
+            [
+                "split_attrs"
+            ]
+        ]
+    },
+    {
+        "id": "split_attrs",
+        "type": "function",
+        "z": "eio_tab",
+        "name": "Split to Attributes",
+        "func": "const d = msg.payload;\nconst out = [];\n\n// Analog inputs\nout.push({payload: d.analog_inputs.AI0.value, attribute: 'current_mA'});\nout.push({payload: d.analog_inputs.AI1.value, attribute: 'vibration_mms'});\n\n// Digital inputs\nout.push({payload: d.digital_inputs.DI0.value, attribute: 'door_sensor'});\nout.push({payload: d.digital_inputs.DI1.value, attribute: 'part_present'});\nout.push({payload: d.digital_inputs.DI2.value, attribute: 'cycle_complete'});\nout.push({payload: d.digital_inputs.DI3.value, attribute: 'material_low'});\nout.push({payload: d.digital_inputs.DI4.value, attribute: 'estop'});\nout.push({payload: d.digital_inputs.DI5.value, attribute: 'guard_closed'});\n\n// Digital outputs\nout.push({payload: d.digital_outputs.DO0.value, attribute: 'stack_green'});\nout.push({payload: d.digital_outputs.DO1.value, attribute: 'stack_yellow'});\nout.push({payload: d.digital_outputs.DO2.value, attribute: 'stack_red'});\nout.push({payload: d.digital_outputs.DO3.value, attribute: 'buzzer'});\n\n// Light kit\nif (d.light_kit) {\n    if (d.light_kit.LK0) {\n        out.push({payload: d.light_kit.LK0.color || '', attribute: 'light_kit_0_color'});\n        out.push({payload: d.light_kit.LK0.mode || '', attribute: 'light_kit_0_mode'});\n    }\n    if (d.light_kit.LK1) {\n        out.push({payload: d.light_kit.LK1.color || '', attribute: 'light_kit_1_color'});\n        out.push({payload: d.light_kit.LK1.mode || '', attribute: 'light_kit_1_mode'});\n    }\n}\n\n// Online status\nout.push({payload: d.online, attribute: 'online'});\n\nreturn [out];",
+        "outputs": 1,
+        "x": 400,
+        "y": 140,
+        "wires": [
+            [
+                "route_attrs"
+            ]
+        ]
+    },
+    {
+        "id": "route_attrs",
+        "type": "function",
+        "z": "eio_tab",
+        "name": "Route by Attribute",
+        "func": "// Map attribute names to output indices\nconst map = {\n    'current_mA': 0,\n    'vibration_mms': 1,\n    'door_sensor': 2,\n    'part_present': 3,\n    'cycle_complete': 4,\n    'material_low': 5,\n    'estop': 6,\n    'guard_closed': 7,\n    'stack_green': 8,\n    'stack_yellow': 9,\n    'stack_red': 10,\n    'buzzer': 11,\n    'light_kit_0_color': 12,\n    'light_kit_0_mode': 13,\n    'light_kit_1_color': 14,\n    'light_kit_1_mode': 15,\n    'last_barcode': 16,\n    'online': 17\n};\n\nconst idx = map[msg.attribute];\nif (idx === undefined) return null;\n\nconst outputs = new Array(18).fill(null);\noutputs[idx] = msg;\nreturn outputs;",
+        "outputs": 18,
+        "x": 640,
+        "y": 140,
+        "wires": [
+            [
+                "tulip_current"
+            ],
+            [
+                "tulip_vibration"
+            ],
+            [
+                "tulip_door"
+            ],
+            [
+                "tulip_part"
+            ],
+            [
+                "tulip_cycle"
+            ],
+            [
+                "tulip_material"
+            ],
+            [
+                "tulip_estop"
+            ],
+            [
+                "tulip_guard"
+            ],
+            [
+                "tulip_stack_g"
+            ],
+            [
+                "tulip_stack_y"
+            ],
+            [
+                "tulip_stack_r"
+            ],
+            [
+                "tulip_buzzer"
+            ],
+            [
+                "tulip_lk0_color"
+            ],
+            [
+                "tulip_lk0_mode"
+            ],
+            [
+                "tulip_lk1_color"
+            ],
+            [
+                "tulip_lk1_mode"
+            ],
+            [
+                "tulip_barcode"
+            ],
+            [
+                "tulip_online"
+            ]
+        ],
+        "info": "Routes each message to the correct output based on attribute name"
+    },
+    {
+        "id": "c2",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "═══ TULIP MACHINE ATTRIBUTE NODES ═══",
+        "x": 230,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "c2a",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "Replace YOUR_DEVICE_ID and each YOUR_ATTRIBUTE_ID_* with values from your Tulip Machine",
+        "x": 350,
+        "y": 250,
+        "wires": []
+    },
+    {
+        "id": "tulip_current",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "current_mA",
+        "apiAuth": "",
+        "keepAlive": false,
+        "keepAliveMsecs": "",
+        "retainMsgProps": false,
+        "singleAttribute": true,
+        "deviceInfo": "",
+        "payloadSource": "",
+        "payloadType": "msg",
+        "x": 920,
+        "y": 280,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_vibration",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "vibration_mms",
+        "x": 930,
+        "y": 320,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_door",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "door_sensor",
+        "x": 920,
+        "y": 360,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_part",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "part_present",
+        "x": 920,
+        "y": 400,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_cycle",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "cycle_complete",
+        "x": 930,
+        "y": 440,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_material",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "material_low",
+        "x": 930,
+        "y": 480,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_estop",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "estop",
+        "x": 910,
+        "y": 520,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_guard",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "guard_closed",
+        "x": 920,
+        "y": 560,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_stack_g",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "stack_green",
+        "x": 920,
+        "y": 600,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_stack_y",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "stack_yellow",
+        "x": 920,
+        "y": 640,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_stack_r",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "stack_red",
+        "x": 920,
+        "y": 680,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_buzzer",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "buzzer",
+        "x": 910,
+        "y": 720,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_lk0_color",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "light_kit_0_color",
+        "x": 940,
+        "y": 760,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_lk0_mode",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "light_kit_0_mode",
+        "x": 940,
+        "y": 800,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_lk1_color",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "light_kit_1_color",
+        "x": 940,
+        "y": 840,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_lk1_mode",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "light_kit_1_mode",
+        "x": 940,
+        "y": 880,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_barcode",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "last_barcode",
+        "x": 930,
+        "y": 920,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "tulip_online",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "online",
+        "x": 910,
+        "y": 960,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "debug_response",
+        "type": "debug",
+        "z": "eio_tab",
+        "name": "Tulip API Response",
+        "active": false,
+        "tosidebar": true,
+        "x": 1170,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "c3",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "═══ BARCODE SCANNER → TULIP ═══",
+        "x": 210,
+        "y": 1020,
+        "wires": []
+    },
+    {
+        "id": "mqtt_scan",
+        "type": "mqtt in",
+        "z": "eio_tab",
+        "name": "Serial Scan",
+        "topic": "factory/edge-io/EIO-01/serial/scan",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "mqtt_broker",
+        "inputs": 0,
+        "x": 150,
+        "y": 1080,
+        "wires": [
+            [
+                "scan_to_tulip",
+                "debug_scan"
+            ]
+        ]
+    },
+    {
+        "id": "scan_to_tulip",
+        "type": "tulip-machine-attribute",
+        "z": "eio_tab",
+        "name": "last_barcode (scan)",
+        "x": 420,
+        "y": 1080,
+        "wires": [
+            [
+                "debug_response"
+            ]
+        ]
+    },
+    {
+        "id": "debug_scan",
+        "type": "debug",
+        "z": "eio_tab",
+        "name": "Barcode",
+        "active": true,
+        "tosidebar": true,
+        "x": 390,
+        "y": 1120,
+        "wires": []
+    },
+    {
+        "id": "c4",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "═══ THROTTLE (optional — reduce API calls) ═══",
+        "x": 260,
+        "y": 1180,
+        "wires": []
+    },
+    {
+        "id": "c4a",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "If your sim publishes every 1s and you have 18 attrs, that's 18 API calls/sec.",
+        "x": 330,
+        "y": 1210,
+        "wires": []
+    },
+    {
+        "id": "c4b",
+        "type": "comment",
+        "z": "eio_tab",
+        "name": "Add a delay node (rate limit 1 msg/5s) between split_attrs and route_attrs if needed.",
+        "x": 340,
+        "y": 1240,
+        "wires": []
+    }
+]

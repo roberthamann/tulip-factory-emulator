@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tulip Factory Floor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; overflow: hidden; font-family: 'Courier New', monospace; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  #tooltip {
+    position: fixed; display: none; pointer-events: none; z-index: 100;
+    background: rgba(0,8,20,0.95); border: 2px solid #00ffcc;
+    border-radius: 4px; padding: 10px 14px; min-width: 210px;
+    font-family: 'Courier New', monospace; font-size: 11px; color: #c8d6e5;
+    box-shadow: 0 0 20px rgba(0,255,204,0.15);
+  }
+  #tooltip .tt-id { color: #00ffcc; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+  #tooltip .tt-state { margin-bottom: 6px; padding: 2px 8px; border-radius: 3px; display: inline-block; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+  .st-running { background: rgba(0,255,100,0.2); color: #00ff66; border: 1px solid #00ff66; }
+  .st-idle { background: rgba(255,200,0,0.2); color: #ffcc00; border: 1px solid #ffcc00; }
+  .st-stopped { background: rgba(100,100,140,0.2); color: #8888aa; border: 1px solid #8888aa; }
+  .st-fault { background: rgba(255,50,50,0.2); color: #ff3333; border: 1px solid #ff3333; }
+  .st-maintenance { background: rgba(0,150,255,0.2); color: #0099ff; border: 1px solid #0099ff; }
+  #tooltip .tt-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  #tooltip .tt-label { color: #5a7a8a; }
+  #tooltip .tt-val { color: #fff; font-weight: bold; }
+  #tooltip .tt-faults { color: #ff4444; margin-top: 6px; font-size: 10px; }
+  #tooltip .tt-hint { color: #00ffcc88; margin-top: 6px; font-size: 9px; text-align: center; }
+
+  #hud {
+    position: fixed; top: 12px; left: 12px; z-index: 50;
+    font-family: 'Courier New', monospace; font-size: 10px; color: #00ffcc;
+    background: rgba(0,8,20,0.8); padding: 8px 14px; border: 1px solid #00ffcc33;
+    border-radius: 4px; line-height: 1.8;
+  }
+
+  #interact-panel {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 200; display: none;
+    background: rgba(4,10,24,0.97); border: 2px solid #00ffcc;
+    border-radius: 8px; width: 480px; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 0 60px rgba(0,255,204,0.15);
+    font-family: 'Courier New', monospace;
+  }
+  #interact-panel::-webkit-scrollbar { width: 4px; }
+  #interact-panel::-webkit-scrollbar-thumb { background: #00ffcc33; border-radius: 2px; }
+  .ip-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px; border-bottom: 1px solid #00ffcc33;
+  }
+  .ip-title { color: #00ffcc; font-size: 14px; font-weight: bold; }
+  .ip-close { background: none; border: 1px solid #ff444466; color: #ff4444; font-family: inherit;
+    font-size: 11px; padding: 4px 12px; border-radius: 4px; cursor: pointer; }
+  .ip-close:hover { background: rgba(255,68,68,0.15); }
+  .ip-section { padding: 14px 18px; border-bottom: 1px solid #ffffff08; }
+  .ip-section-title { font-size: 10px; color: #5a7a8a; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+
+  .ip-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ip-pill {
+    padding: 6px 14px; border-radius: 20px; font-family: inherit; font-size: 10px;
+    font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+    cursor: pointer; border: 1px solid transparent; transition: all 0.15s;
+  }
+  .ip-pill:hover { filter: brightness(1.3); transform: translateY(-1px); }
+  .pill-running { background: rgba(0,255,100,0.15); color: #00ff66; border-color: #00ff6644; }
+  .pill-running.active { background: rgba(0,255,100,0.35); border-color: #00ff66; box-shadow: 0 0 10px rgba(0,255,100,0.2); }
+  .pill-idle { background: rgba(255,200,0,0.15); color: #ffcc00; border-color: #ffcc0044; }
+  .pill-idle.active { background: rgba(255,200,0,0.35); border-color: #ffcc00; box-shadow: 0 0 10px rgba(255,200,0,0.2); }
+  .pill-stopped { background: rgba(100,100,140,0.15); color: #8888aa; border-color: #8888aa44; }
+  .pill-stopped.active { background: rgba(100,100,140,0.35); border-color: #8888aa; box-shadow: 0 0 10px rgba(100,100,140,0.2); }
+  .pill-maintenance { background: rgba(0,150,255,0.15); color: #0099ff; border-color: #0099ff44; }
+  .pill-maintenance.active { background: rgba(0,150,255,0.35); border-color: #0099ff; box-shadow: 0 0 10px rgba(0,150,255,0.2); }
+  .pill-fault { background: rgba(255,50,50,0.15); color: #ff3333; border-color: #ff333344; }
+  .pill-fault.active { background: rgba(255,50,50,0.35); border-color: #ff3333; box-shadow: 0 0 10px rgba(255,50,50,0.2); }
+
+  .ip-slider-row { margin-bottom: 10px; }
+  .ip-slider-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .ip-slider-label { font-size: 10px; color: #8892a8; text-transform: uppercase; letter-spacing: 1px; }
+  .ip-slider-val { font-size: 12px; color: #fff; font-weight: bold; }
+  .ip-slider-val .unit { font-size: 9px; color: #5a7a8a; margin-left: 2px; }
+  .ip-slider { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #1e2a40; outline: none; cursor: pointer; }
+  .ip-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #00ffcc; border: 2px solid #00ffcc88; cursor: pointer; }
+  .ip-slider::-webkit-slider-thumb:hover { box-shadow: 0 0 8px rgba(0,255,204,0.4); }
+  .ip-lock-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 10px; background: #0d1a2a; border-radius: 6px; border: 1px solid #1e2a40; }
+  .ip-lock-label { font-size: 10px; color: #8892a8; text-transform: uppercase; letter-spacing: 1px; }
+  .ip-lock-btn { padding: 4px 12px; font-size: 10px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+  .ip-lock-btn.locked { background: #1e2a40; color: #ff4466; border: 1px solid #ff446644; }
+  .ip-lock-btn.locked:hover { background: #2a1520; border-color: #ff4466; }
+  .ip-lock-btn.unlocked { background: #00ffcc22; color: #00ffcc; border: 1px solid #00ffcc44; }
+  .ip-lock-btn.unlocked:hover { background: #00ffcc33; border-color: #00ffcc; }
+  .ip-slider.disabled { opacity: 0.3; pointer-events: none; cursor: not-allowed; }
+  .ip-lock-status { font-size: 9px; padding: 2px 8px; border-radius: 3px; }
+  .ip-lock-status.locked { color: #ff4466; background: #ff446615; }
+  .ip-lock-status.unlocked { color: #00ffcc; background: #00ffcc15; }
+
+  .ip-fault-list { font-size: 10px; }
+  .ip-fault-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #ffffff08; }
+  .ip-fault-code { color: #ff4444; font-weight: bold; }
+  .ip-fault-msg { color: #c8d6e5; flex: 1; margin: 0 10px; }
+  .ip-ack-all { margin-top: 8px; width: 100%; background: rgba(0,255,204,0.1); color: #00ffcc; border: 1px solid #00ffcc44; border-radius: 4px; padding: 6px; font-family: inherit; font-size: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
+  .ip-ack-all:hover { background: rgba(0,255,204,0.25); }
+
+  .ip-inject-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .ip-inject-btn { background: rgba(255,50,50,0.1); color: #ff6666; border: 1px solid #ff333322; border-radius: 4px; padding: 4px 8px; font-family: inherit; font-size: 9px; cursor: pointer; }
+  .ip-inject-btn:hover { background: rgba(255,50,50,0.25); border-color: #ff3333; }
+
+  #chat-panel {
+    position: fixed; bottom: 12px; right: 12px; z-index: 50;
+    width: 340px; background: rgba(0,8,20,0.92); border: 1px solid #00ffcc33;
+    border-radius: 6px; display: flex; flex-direction: column; max-height: 300px;
+  }
+  #chat-panel .ch-title { padding: 6px 12px; font-size: 10px; color: #00ffcc; border-bottom: 1px solid #00ffcc22; }
+  #chat-msgs { flex: 1; overflow-y: auto; padding: 8px 12px; font-size: 10px; color: #c8d6e5; min-height: 100px; max-height: 200px; }
+  #chat-msgs::-webkit-scrollbar { width: 3px; }
+  #chat-msgs::-webkit-scrollbar-thumb { background: #00ffcc33; }
+  .cm { margin-bottom: 4px; line-height: 1.5; }
+  .cm-user { color: #00ccff; }
+  .cm-ai { color: #00ff88; }
+  .cm-sys { color: #666; }
+  .cm-err { color: #ff4444; }
+  #chat-input-row { display: flex; border-top: 1px solid #00ffcc22; }
+  #chat-input { flex: 1; background: transparent; border: none; color: #fff; font-family: inherit; font-size: 11px; padding: 8px 12px; outline: none; }
+  #chat-send { background: #00ffcc; color: #000; border: none; padding: 8px 14px; font-family: inherit; font-size: 10px; font-weight: bold; cursor: pointer; }
+  #chat-send:hover { background: #33ffdd; }
+
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 190; display: none; }
+.eio-pin-row { display:flex; align-items:center; gap:6px; padding:3px 0; border-bottom:1px solid #1a2a3a; font-size:10px; }
+.eio-pin-id { color:#00ffcc; font-weight:bold; width:28px; font-family:'Courier New'; }
+.eio-pin-label { color:#8a9aaa; width:110px; font-size:9px; }
+.eio-led { width:10px; height:10px; border-radius:50%; border:1px solid #3a3a5a; }
+.eio-led.eio-on { background:#00ff66; box-shadow:0 0 6px #00ff66; }
+.eio-led.eio-off { background:#333; }
+.eio-pin-btn { background:#2a3a4a; color:#aabbcc; border:1px solid #3a4a5a; border-radius:3px; padding:2px 6px; font-size:8px; cursor:pointer; font-family:'Courier New'; }
+.eio-pin-btn:hover { background:#3a4a5a; color:#fff; }
+.eio-auto { color:#ffcc00; border-color:#554400; }
+.eio-ovr { color:#ffcc00; font-size:8px; }
+.eio-ai-row { display:flex; align-items:center; gap:8px; padding:4px 0; font-size:10px; }
+.eio-ai-id { color:#00ccff; font-weight:bold; width:28px; font-family:'Courier New'; }
+.eio-ai-label { color:#8a9aaa; width:130px; font-size:9px; }
+.eio-ai-val { color:#fff; font-weight:bold; font-family:'Courier New'; }
+.eio-lk-section { padding:4px 0; border-bottom:1px solid #1a2a3a; }
+.eio-lk-head { color:#ccc; font-size:10px; display:flex; align-items:center; gap:8px; }
+.eio-lk-preview { display:inline-block; width:14px; height:8px; border-radius:2px; border:1px solid #555; }
+.eio-lk-modes { display:flex; gap:4px; margin:4px 0; flex-wrap:wrap; }
+.eio-lk-mode { background:#1a2a3a; color:#8a9aaa; border:1px solid #2a3a4a; border-radius:3px; padding:2px 6px; font-size:8px; cursor:pointer; font-family:'Courier New'; }
+.eio-lk-mode.active { background:#00443a; color:#00ffcc; border-color:#00ffcc; }
+.eio-lk-mode:hover { background:#2a3a4a; }
+.eio-lk-color-row { display:flex; align-items:center; gap:6px; font-size:9px; color:#8a9aaa; margin:4px 0; }
+.eio-lk-color-row input[type="color"] { width:24px; height:18px; border:1px solid #3a3a5a; background:none; cursor:pointer; }
+.eio-lk-bright { width:60px; }
+.eio-serial-row { display:flex; align-items:center; gap:8px; font-size:10px; }
+.eio-serial-label { color:#8a9aaa; font-size:9px; }
+.eio-serial-data { color:#00ffcc; font-family:'Courier New'; font-weight:bold; font-size:11px; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<div id="tooltip"></div>
+<div id="overlay"></div>
+<div id="interact-panel"></div>
+
+<div id="hud">
+  🌷 TULIP FACTORY FLOOR<br>
+  WASD to move Leonard · Hover for data<br>
+  Press <span style="color:#ffcc00;font-weight:bold;">E</span> near a machine to interact<br>
+  <span id="hud-conn" style="color:#ff4444;">● CONNECTING...</span>
+</div>
+
+<div id="chat-panel">
+  <div class="ch-title">🤖 AI OPERATOR</div>
+  <div id="chat-msgs"><div class="cm cm-sys">Type a command to control the factory...</div></div>
+  <div id="chat-input-row">
+    <input id="chat-input" type="text" placeholder="e.g. shut down Line 2..." />
+    <button id="chat-send">SEND</button>
+  </div>
+</div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+const TILE = 48;
+const OLLAMA_URL   = 'http://localhost:11434/api/chat';
+const OLLAMA_MODEL = 'mistral';
+
+const canvas = document.getElementById('game');
+const ctx    = canvas.getContext('2d');
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+const C = {
+  floor:'#1a1a2e', floorAlt:'#18182c', wall:'#2a2a4a', grid:'#1e1e38',
+  running:'#00ff66', idle:'#ffcc00', stopped:'#666688',
+  fault:'#ff3333', maintenance:'#0099ff', player:'#00ccff',
+  concrete:'#2a2a3e', concreteLt:'#323248',
+  lane:'#3a3a1a', laneStripe:'#7a7a30',
+  steel:'#4a4a5e', steelLt:'#5a5a6e',
+};
+function stateColor(s) {
+  s = s.toLowerCase();
+  return s==='running'?C.running:s==='idle'?C.idle:s==='fault'?C.fault:s==='maintenance'?C.maintenance:C.stopped;
+}
+
+// ── Game state ───────────────────────────────────────────────────────────────
+let plantState = null;
+let machineRects = [];
+let hoveredMachine = null;
+let nearMachine = null;
+let interactMachine = null;
+let slidersUnlocked = false;
+let mouseX = 0, mouseY = 0;
+let camX = 0, camY = 0;
+let edgeIORect = null;
+let interactEdgeIO = false;
+let edgeIOState = null;
+
+const MW = 80, MH = 80, LINE_GAP = 200, MACH_GAP = 110, PAD = 160, INTERACT_DIST = 70;
+const player = { x:300, y:300, w:28, h:36, speed:5, dir:'down', frame:0, moving:false, name:'Leonard' };
+
+// ═══ Leonard's Grumpy Chat Bubbles ═══
+const LEONARD_QUOTES = [
+  "Back in my day, we calibrated by HAND.",
+  "These CNC kids don't know a thing about real machining.",
+  "If I have to look at one more dashboard, I swear...",
+  "This machine's been running since before you were born.",
+  "You call THAT a tolerance? I've seen better from a rusty drill press.",
+  "Nobody respects a good chamfer anymore.",
+  "I didn't survive 40 years of coolant mist for THIS.",
+  "OPC UA? In MY shop? What happened to just listening to the machine?",
+  "The vibration on that lathe... she's hurting. I can FEEL it.",
+  "They replaced my logbook with a TABLET. A tablet!",
+  "I've forgotten more about feeds and speeds than you'll ever learn.",
+  "Touch my micrometer and you lose that hand.",
+  "MQTT? Back in my day we just YELLED across the shop floor.",
+  "That grinding wheel needs dressing. I can hear it from here.",
+  "Whoever set that tool offset should be fired. Twice.",
+  "Young engineers and their 'digital twins'... I AM the digital twin.",
+  "The only cloud I trust is the one coming off the coolant tank.",
+  "Forty years and they give me a hard hat that doesn't even fit right.",
+  "I've seen faults that would make your monitoring software cry.",
+  "Don't touch that emergency stop unless you mean it, kid.",
+  "This floor used to have REAL machines. Cast iron. None of this aluminum nonsense.",
+  "If that spindle sounds happy, leave it alone.",
+  "Another 'software update'. Last one took my lathe offline for three hours.",
+  "I don't need a sensor to tell me that bearing's going bad.",
+  "Grumble grumble... where's my coffee?",
+];
+let chatBubble = { text:'', timer:0, alpha:0 };
+let lastBubbleTime = 0;
+
+function maybeShowBubble(t) {
+  if (t - lastBubbleTime > 12 + Math.random()*18) {
+    chatBubble.text = LEONARD_QUOTES[Math.floor(Math.random()*LEONARD_QUOTES.length)];
+    chatBubble.timer = t;
+    chatBubble.alpha = 1;
+    lastBubbleTime = t;
+  }
+  // Fade out after 5 seconds
+  const age = t - chatBubble.timer;
+  if (age > 5) chatBubble.alpha = Math.max(0, 1 - (age-5)/1.5);
+}
+
+function drawChatBubble(t) {
+  if (chatBubble.alpha <= 0 || !chatBubble.text) return;
+  const sx = player.x - camX + player.w/2;
+  const sy = player.y - camY - 16;
+  ctx.save();
+  ctx.globalAlpha = chatBubble.alpha;
+  ctx.font = 'bold 9px "Courier New"';
+  const tw = ctx.measureText(chatBubble.text).width;
+  const pw = Math.min(tw + 16, 260);
+  // Word wrap
+  const words = chatBubble.text.split(' ');
+  const lines = []; let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > 244) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  const lh = 12, bh = lines.length * lh + 12;
+  const bx = sx - pw/2, by = sy - bh - 8;
+  // Bubble background
+  ctx.fillStyle = '#1a2a3a';
+  ctx.strokeStyle = '#00ffcc88';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(bx+6,by); ctx.lineTo(bx+pw-6,by); ctx.arcTo(bx+pw,by,bx+pw,by+6,6);
+  ctx.lineTo(bx+pw,by+bh-6); ctx.arcTo(bx+pw,by+bh,bx+pw-6,by+bh,6);
+  ctx.lineTo(bx+6,by+bh); ctx.arcTo(bx,by+bh,bx,by+bh-6,6);
+  ctx.lineTo(bx,by+6); ctx.arcTo(bx,by,bx+6,by,6);
+  ctx.fill(); ctx.stroke();
+  // Triangle pointer
+  ctx.fillStyle = '#1a2a3a';
+  ctx.beginPath();
+  ctx.moveTo(sx-5, by+bh); ctx.lineTo(sx+5, by+bh); ctx.lineTo(sx, by+bh+6); ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#00ffcc88'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(sx-5, by+bh); ctx.lineTo(sx, by+bh+6); ctx.lineTo(sx+5, by+bh); ctx.stroke();
+  // Text
+  ctx.fillStyle = '#e0e0e0'; ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, sx, by + 10 + i * lh));
+  // Name tag
+  ctx.fillStyle = '#00ffcc'; ctx.font = 'bold 8px "Courier New"';
+  ctx.fillText('LEONARD', sx, by - 3);
+  ctx.restore();
+}
+const keys = {};
+
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
+  if (e.key.toLowerCase() === 'e' && !interactMachine && !interactEdgeIO && nearMachine) { if(nearMachine.device_id) openEdgeIOInteract(); else openInteract(nearMachine); }
+  if (e.key === 'Escape' && interactMachine) closeInteract(); if (e.key === 'Escape' && interactEdgeIO) closeEdgeIOInteract();
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function layoutFactory() {
+  if (!plantState) return;
+  machineRects = [];
+  let yOff = PAD + 40;
+  plantState.lines.forEach(line => {
+    const xStart = PAD + 60;
+    line.machines.forEach((m, mi) => {
+      machineRects.push({ x: xStart + mi * (MW + MACH_GAP), y: yOff, w: MW, h: MH, machine: m, lineId: line.line_id, lineName: line.name });
+    });
+    yOff += LINE_GAP;
+  });
+}
+function getWorldSize() {
+  if (!plantState) return {w:2000,h:1200};
+  const maxM = plantState.lines.reduce((a,l)=>Math.max(a,l.machines.length),0);
+  // Place Edge IO device on the floor — right of first machine, in walkway
+  if (machineRects.length > 0) {
+    const mr0 = machineRects[0];
+    edgeIORect = { x: mr0.x + MW + 30, y: mr0.y + MH + 30, w: 56, h: 44 };
+  }
+  return { w: PAD*2+60+maxM*(MW+MACH_GAP)+60, h: PAD+40+plantState.lines.length*LINE_GAP+PAD };
+}
+
+// ── Pixel helper ─────────────────────────────────────────────────────────────
+function px(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(Math.round(x),Math.round(y),w,h); }
+function bolt(x,y){ px(x,y,3,3,'#7a7a8e'); px(x+1,y+1,1,1,'#9a9aae'); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  FLOOR
+// ═════════════════════════════════════════════════════════════════════════════
+function drawFloor(t) {
+  const world = getWorldSize();
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const sc = Math.floor(camX/TILE), sr = Math.floor(camY/TILE);
+  const ec = sc + Math.ceil(canvas.width/TILE)+1, er = sr + Math.ceil(canvas.height/TILE)+1;
+  for (let r=sr; r<=er; r++) {
+    for (let c=sc; c<=ec; c++) {
+      const sx=c*TILE-camX, sy=r*TILE-camY;
+      const inside = c*TILE>=0 && r*TILE>=0 && c*TILE<world.w && r*TILE<world.h;
+      if (inside) {
+        ctx.fillStyle = (r+c)%2===0 ? C.concrete : C.concreteLt;
+        ctx.fillRect(sx,sy,TILE,TILE);
+        if ((r*7+c*13)%11===0) { ctx.fillStyle='#252539'; ctx.fillRect(sx+10,sy+20,18,1); }
+        if ((r*3+c*17)%13===0) { ctx.fillStyle='#2f2f45'; ctx.fillRect(sx+5,sy+8,1,14); }
+        ctx.strokeStyle='#1a1a30'; ctx.lineWidth=0.5; ctx.strokeRect(sx,sy,TILE,TILE);
+      } else {
+        ctx.fillStyle='#0a0a14'; ctx.fillRect(sx,sy,TILE,TILE);
+      }
+    }
+  }
+
+  // Safety lanes
+  if (plantState) {
+    let yOff = PAD + 40;
+    plantState.lines.forEach(() => {
+      const ly = yOff + MH + 20 - camY, lh = LINE_GAP - MH - 40;
+      ctx.fillStyle = C.lane; ctx.fillRect(-camX, ly, world.w, lh);
+      ctx.setLineDash([16,12]); ctx.strokeStyle=C.laneStripe; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(-camX,ly+lh/2); ctx.lineTo(world.w-camX,ly+lh/2); ctx.stroke();
+      ctx.setLineDash([]);
+      yOff += LINE_GAP;
+    });
+  }
+
+  // Walls
+  ctx.strokeStyle='#3a3a5a'; ctx.lineWidth=4;
+  ctx.strokeRect(-camX,-camY,world.w,world.h);
+  for (let i=0; i<world.w; i+=120) {
+    px(i-camX,-camY-8,6,12,'#3a3a5a');
+    px(i-camX,world.h-camY-4,6,12,'#3a3a5a');
+  }
+
+}
+
+
+function drawLineLabels() {
+  if (!plantState) return;
+  let yOff = PAD + 40;
+  plantState.lines.forEach(line => {
+    const sx = PAD - 10 - camX, sy = yOff - 28 - camY;
+    ctx.fillStyle='#1a1a3a'; ctx.fillRect(sx,sy,180,22);
+    ctx.strokeStyle='#00ffcc44'; ctx.lineWidth=1; ctx.strokeRect(sx,sy,180,22);
+    ctx.font='bold 11px "Courier New"'; ctx.fillStyle='#00ffcc'; ctx.textAlign='left';
+    ctx.fillText(`LINE ${line.line_id} — ${line.name}`, sx+8, sy+15);
+    yOff += LINE_GAP;
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MACHINE DRAWING — dispatch by type prefix from machine_id
+// ═════════════════════════════════════════════════════════════════════════════
+function drawMachines(t) {
+  machineRects.forEach(mr => {
+    const sx=mr.x-camX, sy=mr.y-camY, m=mr.machine;
+    const col = stateColor(m.state);
+    const isHover = hoveredMachine && hoveredMachine.machine_id===m.machine_id;
+    const isNear  = nearMachine && nearMachine.machine_id===m.machine_id;
+    const type = m.machine_id.split('-')[0];
+    const run  = m.state.toLowerCase()==='running';
+    const flt  = m.state.toLowerCase()==='fault';
+    const mnt  = m.state.toLowerCase()==='maintenance';
+
+    // Platform
+    px(sx-4,sy+MH-8,MW+8,12,'#22223a');
+    px(sx-2,sy+MH-6,MW+4,8,'#1a1a30');
+    // Shadow
+    ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(sx+6,sy+6,MW,MH);
+    // Body bg
+    px(sx,sy,MW,MH,'#1c1c34');
+
+    // Border
+    if (flt) {
+      ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.globalAlpha=0.5+0.5*Math.sin(t*8);
+      ctx.strokeRect(sx-1,sy-1,MW+2,MH+2);
+      ctx.globalAlpha=1;
+    } else if (mnt) {
+      ctx.strokeStyle=C.maintenance; ctx.lineWidth=2;
+      ctx.globalAlpha=0.6+0.4*Math.sin(t*3);
+      ctx.strokeRect(sx-1,sy-1,MW+2,MH+2);
+      ctx.globalAlpha=1;
+    } else if (isHover||isNear) {
+      ctx.strokeStyle='#00ffcc'; ctx.lineWidth=2; ctx.strokeRect(sx-1,sy-1,MW+2,MH+2);
+    } else {
+      ctx.strokeStyle=col+'88'; ctx.lineWidth=1; ctx.strokeRect(sx,sy,MW,MH);
+    }
+
+    // ── Dispatch per type ──
+    if      (type==='MILL')  drawMill(sx,sy,MW,MH,col,run,t);
+    else if (type==='LATHE') drawLathe(sx,sy,MW,MH,col,run,t);
+    else if (type==='DRILL') drawDrill(sx,sy,MW,MH,col,run,t);
+    else if (type==='GRND')  drawGrinder(sx,sy,MW,MH,col,run,t);
+    else if (type==='CONV')  drawConveyor(sx,sy,MW,MH,col,run,t);
+    else if (type==='CNC')   drawCNC(sx,sy,MW,MH,col,run,t);
+    else if (type==='PRESS') drawPress(sx,sy,MW,MH,col,run,t);
+    else                     drawGeneric(sx,sy,MW,MH,col,run,t);
+
+    // Maintenance wrench overlay
+    if (mnt) drawWrenchOverlay(sx,sy,MW,MH,t);
+
+    // Status LED
+    ctx.beginPath(); ctx.arc(sx+MW-8,sy+8,4,0,Math.PI*2);
+    ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=run?10:4; ctx.fill(); ctx.shadowBlur=0;
+
+    // Bolts
+    bolt(sx+3,sy+3); bolt(sx+MW-6,sy+MH-6); bolt(sx+3,sy+MH-6); bolt(sx+MW-6,sy+3);
+
+    // Label
+    ctx.font='8px "Courier New"'; ctx.fillStyle=isHover?'#fff':'#7a7a9a'; ctx.textAlign='center';
+    ctx.fillText(m.machine_id, sx+MW/2, sy+MH+14);
+
+    // Particles
+    if (run) drawParticles(sx,sy,MW,type,t);
+    if (flt) drawDangerStripes(sx,sy,MW,t);
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MILL
+// ═════════════════════════════════════════════════════════════════════════════
+function drawMill(sx,sy,w,h,col,run,t) {
+  // Column
+  px(sx+30,sy+6,20,54,C.steel); px(sx+32,sy+8,16,50,C.steelLt);
+  // Head
+  px(sx+22,sy+8,36,16,'#4a4a60'); px(sx+24,sy+10,32,12,'#5a5a70');
+  // Spindle
+  const sOff = run ? Math.sin(t*15)*2 : 0;
+  px(sx+37+sOff,sy+24,6,16,col+'cc'); px(sx+38+sOff,sy+25,4,14,col);
+  // Tool bit
+  px(sx+39,sy+40,2,8,'#ffd700');
+  // Table
+  px(sx+10,sy+52,60,10,'#4a4a60'); px(sx+12,sy+54,56,6,'#5a5a70');
+  // Table T-slots
+  px(sx+18,sy+55,8,1,'#3a3a50'); px(sx+34,sy+55,8,1,'#3a3a50'); px(sx+50,sy+55,8,1,'#3a3a50');
+  // Workpiece
+  px(sx+26,sy+48,28,6,'#8a8a9a'); px(sx+28,sy+49,24,4,'#9a9aaa');
+  // Control panel
+  px(sx+4,sy+14,14,28,'#1a2a3a'); px(sx+6,sy+16,10,8,'#0a1a22');
+  px(sx+7,sy+18,3,3,run?'#00ff66':'#333'); px(sx+12,sy+18,3,3,'#ff2222');
+  px(sx+7,sy+26,8,3,'#0066aa'); px(sx+7,sy+32,8,6,'#2a3a4a');
+  // Coolant hose
+  if (run) {
+    ctx.strokeStyle='#0088cc44'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(sx+62,sy+14); ctx.quadraticCurveTo(sx+66,sy+30,sx+50,sy+42); ctx.stroke();
+    ctx.fillStyle='#0099ff33';
+    for (let i=0;i<3;i++) ctx.fillRect(sx+48+Math.sin(t*6+i)*4,sy+42+i*3,2,2);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LATHE
+// ═════════════════════════════════════════════════════════════════════════════
+function drawLathe(sx,sy,w,h,col,run,t) {
+  // Bed
+  px(sx+4,sy+44,72,18,C.steel); px(sx+6,sy+46,68,14,C.steelLt);
+  // Rails
+  px(sx+8,sy+42,64,2,'#6a6a7e'); px(sx+8,sy+62,64,2,'#6a6a7e');
+  // Headstock
+  px(sx+4,sy+12,26,34,'#4a4a60'); px(sx+6,sy+14,22,30,'#5a5a70');
+  // Chuck (rotating)
+  ctx.save(); ctx.translate(sx+17,sy+30); ctx.rotate(run?t*8:0);
+  ctx.fillStyle=col+'cc';
+  ctx.fillRect(-9,-9,18,18);
+  // Chuck jaws
+  ctx.fillStyle='#7a7a8e';
+  ctx.fillRect(-10,-3,4,6); ctx.fillRect(6,-3,4,6); ctx.fillRect(-3,-10,6,4); ctx.fillRect(-3,6,6,4);
+  ctx.fillStyle=col; ctx.fillRect(-5,-5,10,10);
+  ctx.fillStyle='#333'; ctx.fillRect(-2,-2,4,4);
+  ctx.restore();
+  // Tailstock
+  px(sx+56,sy+16,16,28,'#4a4a60'); px(sx+58,sy+18,12,24,'#5a5a70');
+  px(sx+54,sy+28,4,4,'#7a7a8e'); // Live center
+  // Carriage
+  const cOff = run ? Math.sin(t*2)*10 : 0;
+  px(sx+30+cOff,sy+28,16,16,'#3a3a54');
+  px(sx+32+cOff,sy+30,12,4,'#5a5a6e');
+  // Tool post & cutting tool
+  px(sx+34+cOff,sy+24,8,6,'#7a7a8e');
+  px(sx+37+cOff,sy+22,2,4,'#ffd700');
+  // Workpiece
+  px(sx+24,sy+28,34,4,'#9a9aaa'); px(sx+24,sy+29,34,2,'#aaaabc');
+  // Lead screw
+  px(sx+10,sy+62,56,2,'#5a5a6e');
+  // Chip tray
+  px(sx+20,sy+66,40,6,'#2a2a3e');
+  if (run) {
+    ctx.fillStyle='#8888aa44';
+    for(let i=0;i<4;i++) ctx.fillRect(sx+25+i*8+Math.random()*2,sy+67,3,2);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DRILL
+// ═════════════════════════════════════════════════════════════════════════════
+function drawDrill(sx,sy,w,h,col,run,t) {
+  // Column
+  px(sx+34,sy+6,12,60,'#4a4a60'); px(sx+36,sy+8,8,56,'#5a5a70');
+  // Head assembly
+  px(sx+22,sy+8,36,20,C.steel); px(sx+24,sy+10,32,16,C.steelLt);
+  // Motor housing
+  px(sx+26,sy+4,28,8,'#3a3a54');
+  px(sx+28,sy+5,6,6,run?col+'88':'#333');
+  // Quill
+  const plunge = run ? Math.sin(t*4)*8 : 0;
+  px(sx+38,sy+28+plunge,4,16,'#bbb'); px(sx+39,sy+28+plunge,2,16,'#ddd');
+  // Drill bit
+  px(sx+38,sy+42+plunge,4,4,'#ffd700');
+  px(sx+39,sy+44+plunge,2,4,'#ffee44');
+  // Flute lines
+  if (run) {
+    for (let i=0;i<5;i++) px(sx+38,sy+30+plunge+i*3,4,1,col+'44');
+  }
+  // Depth gauge
+  px(sx+46,sy+20,3,20,'#5a5a6e');
+  px(sx+46,sy+20+plunge*0.5+10,3,3,col);
+  // Table
+  px(sx+12,sy+54,56,10,'#4a4a60'); px(sx+14,sy+56,52,6,'#5a5a70');
+  // Workpiece
+  px(sx+26,sy+50,28,6,'#8a8a9a');
+  // Drilled holes
+  ctx.fillStyle='#333';
+  for (let i=0;i<4;i++) ctx.fillRect(sx+30+i*6,sy+52,3,2);
+  // Chuck
+  px(sx+34,sy+26+plunge,12,4,'#6a6a7e');
+  // Base
+  px(sx+8,sy+64,64,8,'#3a3a50');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  GRINDER
+// ═════════════════════════════════════════════════════════════════════════════
+function drawGrinder(sx,sy,w,h,col,run,t) {
+  // Body
+  px(sx+12,sy+14,56,40,C.steel); px(sx+14,sy+16,52,36,C.steelLt);
+  // Wheel guard (arc shape via rects)
+  px(sx+20,sy+14,36,6,'#3a3a54'); px(sx+18,sy+18,4,20,'#3a3a54'); px(sx+54,sy+18,4,20,'#3a3a54');
+  // Grinding wheel
+  ctx.save(); ctx.translate(sx+40,sy+34); ctx.rotate(run?t*20:0);
+  ctx.fillStyle='#7a7a8e'; ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#6a6a7e'; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill();
+  // Abrasive texture
+  ctx.fillStyle='#5a5a6e'; ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill();
+  // Hub
+  ctx.fillStyle='#4a4a5e'; ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#8a8a9e'; ctx.beginPath(); ctx.arc(0,0,2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // Sparks
+  if (run) {
+    ctx.fillStyle='#ffcc00';
+    for (let i=0;i<8;i++) {
+      const a=t*12+i*0.9, r=14+i*3;
+      const spx=sx+40+Math.cos(a)*r, spy=sy+34+Math.sin(a)*r*0.5-i*2;
+      ctx.fillRect(spx,spy,2,2);
+    }
+    ctx.fillStyle='#ff880066';
+    for (let i=0;i<3;i++) {
+      const spx=sx+40+Math.cos(t*10+i*2)*18;
+      ctx.fillRect(spx,sy+30-i*4,1,1);
+    }
+  }
+  // Table
+  px(sx+8,sy+56,64,8,'#4a4a60'); px(sx+10,sy+58,60,4,'#5a5a70');
+  // Magnetic chuck
+  px(sx+16,sy+52,48,6,'#5a6a7a');
+  // Workpiece
+  px(sx+28,sy+50,24,4,'#9a9aaa');
+  // Motor
+  px(sx+4,sy+22,10,20,'#3a3a54');
+  px(sx+5,sy+24,8,4,run?col:'#444');
+  // Coolant nozzle
+  px(sx+58,sy+22,6,12,'#4a4a5e');
+  if (run) { ctx.fillStyle='#0099ff22'; ctx.fillRect(sx+59,sy+34,4,8); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CONVEYOR
+// ═════════════════════════════════════════════════════════════════════════════
+function drawConveyor(sx,sy,w,h,col,run,t) {
+  // Frame
+  px(sx+2,sy+22,76,36,'#3a3a54'); px(sx+4,sy+24,72,32,'#2a2a44');
+  // Side rails
+  px(sx+2,sy+20,76,4,'#5a5a70'); px(sx+2,sy+56,76,4,'#5a5a70');
+  // Belt
+  const bOff = run ? (t*40)%12 : 0;
+  ctx.fillStyle='#444460'; ctx.fillRect(sx+6,sy+28,68,20);
+  // Belt segments
+  for (let i=-1;i<8;i++) {
+    const bx=sx+6+((i*12+bOff)%84);
+    if (bx>=sx+6 && bx<sx+72) {
+      px(bx,sy+28,8,20,'#4e4e68');
+      px(bx+1,sy+29,6,18,'#525272');
+    }
+  }
+  // Belt surface texture
+  px(sx+6,sy+28,68,1,'#555575'); px(sx+6,sy+47,68,1,'#3a3a50');
+  // Rollers
+  for (let i=0;i<4;i++) {
+    const rx=sx+12+i*18;
+    ctx.fillStyle='#5a5a70'; ctx.beginPath(); ctx.arc(rx,sy+54,5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#7a7a8e'; ctx.beginPath(); ctx.arc(rx,sy+54,2,0,Math.PI*2); ctx.fill();
+  }
+  // Items on belt
+  if (run) {
+    for (let i=0;i<3;i++) {
+      const ix = (bOff*3+i*24)%64;
+      const colors = ['#8a6a3a','#6a8a3a','#3a6a8a'];
+      px(sx+8+ix,sy+22,12,8,colors[i]);
+      px(sx+9+ix,sy+23,10,6,colors[i]+'cc');
+    }
+  }
+  // Motor box
+  px(sx+58,sy+6,16,18,'#3a3a54'); px(sx+60,sy+8,12,14,'#2a2a3e');
+  px(sx+63,sy+11,6,4,run?col:'#444');
+  // Drive belt from motor to roller
+  ctx.strokeStyle='#5a5a6e'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(sx+66,sy+22); ctx.lineTo(sx+66,sy+54); ctx.stroke();
+  // Guard rail posts
+  px(sx+2,sy+14,4,8,'#5a5a70'); px(sx+74,sy+14,4,8,'#5a5a70');
+  // Sensor eye
+  px(sx+36,sy+18,8,4,run?'#00ff6644':'#222');
+  if (run) { px(sx+37,sy+19,6,2,'#00ff66'); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CNC MACHINING CENTER
+// ═════════════════════════════════════════════════════════════════════════════
+function drawCNC(sx,sy,w,h,col,run,t) {
+  // Enclosed cabinet
+  px(sx+4,sy+4,72,66,'#3a3a54'); px(sx+6,sy+6,68,62,'#4a4a64');
+  // Ventilation slots on top
+  for (let i=0;i<5;i++) px(sx+18+i*10,sy+4,6,2,'#2a2a3e');
+  // Viewing window
+  px(sx+16,sy+10,36,30,'#0a1a2a'); px(sx+17,sy+11,34,28,'#0d2233');
+  // Window frame
+  px(sx+16,sy+10,36,2,'#5a5a70'); px(sx+16,sy+38,36,2,'#5a5a70');
+  px(sx+16,sy+10,2,30,'#5a5a70'); px(sx+50,sy+10,2,30,'#5a5a70');
+  // Window cross-brace
+  px(sx+33,sy+10,2,30,'#5a5a7044');
+  // Inside window: spindle head
+  px(sx+28,sy+12,12,8,'#6a6a7e');
+  // Spindle
+  const sOff = run ? Math.sin(t*18)*2 : 0;
+  px(sx+31+sOff,sy+20,6,10,'#bbb'); px(sx+32+sOff,sy+20,4,10,'#ddd');
+  // Tool
+  px(sx+33,sy+30,2,6,'#ffd700');
+  // Coolant spray
+  if (run) {
+    ctx.fillStyle='rgba(100,200,255,0.25)';
+    for (let i=0;i<6;i++) {
+      const cx2=sx+34+Math.sin(t*10+i*1.3)*8, cy2=sy+20+Math.cos(t*8+i*1.7)*8;
+      ctx.fillRect(cx2,cy2,2,2);
+    }
+    // Metal chips
+    ctx.fillStyle='#aaa';
+    for (let i=0;i<4;i++) {
+      const cx2=sx+30+Math.sin(t*14+i*2)*10, cy2=sy+30+Math.cos(t*11+i*3)*4;
+      ctx.fillRect(cx2,cy2,1,1);
+    }
+  }
+  // Workpiece inside window
+  px(sx+22,sy+34,24,4,'#8a8a9a');
+  // Tool magazine (right side)
+  px(sx+56,sy+10,14,32,'#3a3a4e'); px(sx+58,sy+12,10,28,'#2a2a3e');
+  for (let i=0;i<5;i++) {
+    px(sx+59,sy+14+i*5,8,3,'#5a5a6e');
+    px(sx+61,sy+14+i*5,4,3,run?col+'88':'#444');
+  }
+  // ATC carousel indicator
+  if (run) {
+    const ti = Math.floor(t*2)%5;
+    px(sx+59,sy+14+ti*5,8,3,col);
+  }
+  // Control panel (left side)
+  px(sx+4,sy+10,12,42,'#1a2a3a');
+  // Screen
+  px(sx+5,sy+12,10,10,run?'#002a1a':'#111');
+  if (run) {
+    ctx.fillStyle='#00ff6688';
+    const scroll = Math.floor(t*3)%4;
+    for (let i=0;i<4;i++) ctx.fillRect(sx+6,sy+13+i*2,6+((i+scroll)%3),1);
+  }
+  // Buttons
+  px(sx+6,sy+24,4,4,run?'#00ff66':'#333');
+  px(sx+11,sy+24,4,4,'#ff2222');
+  px(sx+6,sy+30,4,4,'#0066aa');
+  px(sx+11,sy+30,4,4,'#ffaa00');
+  // Jog wheel
+  ctx.fillStyle='#3a4a5a'; ctx.beginPath(); ctx.arc(sx+10,sy+42,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#4a5a6a'; ctx.beginPath(); ctx.arc(sx+10,sy+42,3,0,Math.PI*2); ctx.fill();
+  // Chip conveyor
+  px(sx+10,sy+58,50,8,'#2a2a3e'); px(sx+12,sy+60,46,4,'#333350');
+  if (run) {
+    const cOff=(t*20)%10;
+    ctx.fillStyle='#4a4a5e';
+    for(let i=0;i<5;i++) ctx.fillRect(sx+14+i*10+(cOff%10),sy+60,6,4);
+    ctx.fillStyle='#8a8a6a';
+    for(let i=0;i<3;i++) ctx.fillRect(sx+18+i*14+(cOff%10),sy+59,3,2);
+  }
+  // Cabinet door handle
+  px(sx+14,sy+44,2,10,'#7a7a8e');
+  // Status bar
+  px(sx+16,sy+6,36,3,run?col+'66':'#333');
+  if (run) { ctx.fillStyle=col+'33'; ctx.fillRect(sx+16,sy+6,36*(0.5+0.5*Math.sin(t*2)),3); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  HYDRAULIC PRESS
+// ═════════════════════════════════════════════════════════════════════════════
+function drawPress(sx,sy,w,h,col,run,t) {
+  // Frame (C-frame press shape)
+  px(sx+8,sy+4,64,8,'#4a4a60');   // Top beam
+  px(sx+8,sy+4,10,68,'#4a4a60');  // Left column
+  px(sx+62,sy+4,10,68,'#4a4a60'); // Right column
+  px(sx+8,sy+64,64,8,'#4a4a60');  // Base
+  // Inner frame detail
+  px(sx+10,sy+6,60,4,'#5a5a70');
+  px(sx+10,sy+8,6,60,'#5a5a70'); px(sx+64,sy+8,6,60,'#5a5a70');
+  px(sx+10,sy+66,60,4,'#5a5a70');
+  // Hydraulic cylinder on top
+  px(sx+30,sy+2,20,8,'#5a6a7a'); px(sx+34,sy+0,12,4,'#6a7a8a');
+  // Ram / slide (animated press stroke)
+  const stroke = run ? Math.abs(Math.sin(t*3))*18 : 0;
+  px(sx+24,sy+14+stroke,32,12,'#6a6a80'); px(sx+26,sy+16+stroke,28,8,'#7a7a90');
+  // Ram face (die)
+  px(sx+28,sy+24+stroke,24,6,'#8a8a9e');
+  // Die cushion pattern
+  px(sx+30,sy+25+stroke,6,3,'#7a7a8e'); px(sx+40,sy+25+stroke,6,3,'#7a7a8e');
+  // Bolster / bed
+  px(sx+20,sy+52,40,10,'#5a5a70'); px(sx+22,sy+54,36,6,'#6a6a80');
+  // Lower die
+  px(sx+28,sy+48,24,6,'#8a8a9e');
+  px(sx+30,sy+49,6,3,'#7a7a8e'); px(sx+40,sy+49,6,3,'#7a7a8e');
+  // Workpiece (getting squished when running)
+  const wpH = run ? Math.max(2, 6-stroke*0.25) : 6;
+  px(sx+32,sy+46-wpH+6,16,wpH,'#cc8844');
+  // Hydraulic lines
+  ctx.strokeStyle='#445566'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(sx+35,sy+4); ctx.lineTo(sx+35,sy-2); ctx.lineTo(sx+6,sy-2); ctx.lineTo(sx+6,sy+20); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx+45,sy+4); ctx.lineTo(sx+45,sy-2); ctx.lineTo(sx+74,sy-2); ctx.lineTo(sx+74,sy+20); ctx.stroke();
+  // Pressure gauge
+  ctx.fillStyle='#1a2a3a'; ctx.beginPath(); ctx.arc(sx+6,sy+24,6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0a1a22'; ctx.beginPath(); ctx.arc(sx+6,sy+24,4,0,Math.PI*2); ctx.fill();
+  // Gauge needle
+  const needleAngle = run ? -Math.PI*0.3+stroke*0.05 : -Math.PI*0.8;
+  ctx.strokeStyle=run?col:'#555'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(sx+6,sy+24);
+  ctx.lineTo(sx+6+Math.cos(needleAngle)*3,sy+24+Math.sin(needleAngle)*3); ctx.stroke();
+  // Control buttons
+  px(sx+66,sy+20,8,6,run?'#00ff66':'#333');
+  px(sx+66,sy+28,8,6,'#ff2222');
+  px(sx+66,sy+36,8,6,'#ffaa00');
+  // Safety light curtain (side beams)
+  if (run) {
+    ctx.fillStyle='#ff000018';
+    ctx.fillRect(sx+18,sy+14,2,38);
+    ctx.fillRect(sx+60,sy+14,2,38);
+    // Light beam dots
+    ctx.fillStyle='#ff000044';
+    for (let i=0;i<6;i++) {
+      ctx.fillRect(sx+18,sy+16+i*6,2,2);
+      ctx.fillRect(sx+60,sy+16+i*6,2,2);
+    }
+  }
+  // Tonnage label
+  ctx.font='bold 7px "Courier New"'; ctx.fillStyle='#ffcc0066'; ctx.textAlign='center';
+  ctx.fillText('200T',sx+40,sy+72);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  GENERIC FALLBACK
+// ═════════════════════════════════════════════════════════════════════════════
+function drawGeneric(sx,sy,w,h,col,run,t) {
+  px(sx+8,sy+8,w-16,h-16,C.steel); px(sx+10,sy+10,w-20,h-20,C.steelLt);
+  ctx.font='bold 12px "Courier New"'; ctx.fillStyle=col; ctx.textAlign='center';
+  ctx.fillText('?',sx+w/2,sy+h/2+4);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MAINTENANCE WRENCH OVERLAY
+// ═════════════════════════════════════════════════════════════════════════════
+function drawWrenchOverlay(sx,sy,w,h,t) {
+  ctx.save();
+  ctx.globalAlpha = 0.6 + 0.3*Math.sin(t*3);
+  ctx.translate(sx+w/2, sy+h/2);
+  ctx.rotate(Math.sin(t*2)*0.3);
+  // Wrench shape
+  ctx.fillStyle='#0099ff';
+  ctx.fillRect(-2,-14,4,28);
+  ctx.fillRect(-6,-14,12,6);
+  ctx.fillRect(-5,8,10,6);
+  ctx.fillStyle='#33bbff';
+  ctx.fillRect(-4,-12,8,3);
+  ctx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PARTICLES & EFFECTS
+// ═════════════════════════════════════════════════════════════════════════════
+function drawParticles(sx,sy,w,type,t) {
+  if (type==='MILL'||type==='LATHE'||type==='CNC') {
+    ctx.fillStyle='rgba(100,200,255,0.12)';
+    for (let i=0;i<5;i++) {
+      const px2=sx+w/2+Math.sin(t*3+i)*16, py2=sy-6-i*5-Math.sin(t*2+i)*3;
+      ctx.beginPath(); ctx.arc(px2,py2,3+Math.sin(t+i)*1.5,0,Math.PI*2); ctx.fill();
+    }
+  }
+  if (type==='GRND') {
+    ctx.fillStyle='#ffcc00cc';
+    for (let i=0;i<8;i++) {
+      const a=t*12+i*1.1, r=12+i*3;
+      ctx.fillRect(sx+w/2+Math.cos(a)*r, sy+10+Math.sin(a)*r*0.4, 2, 2);
+    }
+  }
+  if (type==='PRESS') {
+    // Hydraulic hiss
+    ctx.fillStyle='rgba(200,200,255,0.08)';
+    for (let i=0;i<3;i++) {
+      const px2=sx+8+Math.sin(t*5+i)*4, py2=sy+20+i*8;
+      ctx.beginPath(); ctx.arc(px2,py2,4,0,Math.PI*2); ctx.fill();
+    }
+  }
+}
+
+function drawDangerStripes(sx,sy,w,t) {
+  ctx.save();
+  ctx.globalAlpha=0.15+0.1*Math.sin(t*6);
+  const s=6;
+  ctx.fillStyle='#ff3333';
+  for (let i=-2;i<w/s+2;i++) {
+    const bx=sx+i*s*2+((t*20)%(s*2));
+    ctx.fillRect(bx,sy-2,s,3);
+    ctx.fillRect(bx,sy+MH,s,3);
+  }
+  ctx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PLAYER
+// ═════════════════════════════════════════════════════════════════════════════
+function drawEdgeIO(t) {
+  if (!edgeIORect || !edgeIOState) return;
+  const r = edgeIORect;
+  const sx = r.x - camX, sy = r.y - camY;
+  const online = edgeIOState.online;
+  const isHover = hoveredMachine && hoveredMachine.device_id === 'EIO-01';
+  const isNear = nearMachine && nearMachine.device_id === 'EIO-01';
+
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(sx+4,sy+4,r.w,r.h);
+
+  // Main body — dark enclosure
+  px(sx,sy,r.w,r.h,'#1a2a1a');
+  px(sx+2,sy+2,r.w-4,r.h-4,'#223322');
+  px(sx+3,sy+3,r.w-6,r.h-6,'#2a3a2a');
+
+  // Top label strip
+  px(sx+4,sy+3,r.w-8,10,'#1a1a2a');
+  ctx.font='bold 7px "Courier New"'; ctx.fillStyle='#00ffcc'; ctx.textAlign='center';
+  ctx.fillText('EDGE IO', sx+r.w/2, sy+10);
+
+  // Status LED (top right)
+  ctx.fillStyle = online ? '#00ff66' : '#ff3333';
+  ctx.globalAlpha = 0.7 + 0.3*Math.sin(t*4);
+  ctx.beginPath(); ctx.arc(sx+r.w-8, sy+8, 3, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // GPIO indicator LEDs row — DI0-DI7
+  const di = edgeIOState.digital_inputs;
+  for (let i=0; i<8; i++) {
+    const lx = sx + 6 + i*6, ly = sy + 16;
+    const val = di[`DI${i}`]?.value;
+    ctx.fillStyle = val ? '#00ff66' : '#333';
+    ctx.fillRect(lx, ly, 4, 3);
+  }
+
+  // GPO LEDs — DO0-DO3
+  const dout = edgeIOState.digital_outputs;
+  const doCols = ['#00ff66','#ffcc00','#ff3333','#ff8800'];
+  for (let i=0; i<4; i++) {
+    const lx = sx + 6 + i*8, ly = sy + 22;
+    const val = dout[`DO${i}`]?.value;
+    ctx.fillStyle = val ? doCols[i] : '#333';
+    ctx.fillRect(lx, ly, 5, 3);
+  }
+
+  // Light Kit preview strips — 2 thin bars
+  if (edgeIOState.light_kit) {
+    for (let c=0; c<2; c++) {
+      const lk = edgeIOState.light_kit[c];
+      const ly = sy + 28 + c*5;
+      if (lk.mode !== 'off') {
+        ctx.fillStyle = lk.color || '#333';
+        ctx.globalAlpha = (lk.mode === 'pulse') ? 0.5+0.5*Math.sin(t*4) : 0.8;
+        if (lk.mode === 'chase') {
+          for (let s=0; s<6; s++) {
+            const shift = (Math.floor(t*6)+s) % 8;
+            ctx.fillRect(sx+6+shift*6, ly, 4, 3);
+          }
+        } else {
+          ctx.fillRect(sx+6, ly, r.w-12, 3);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle='#222'; ctx.fillRect(sx+6, ly, r.w-12, 3);
+      }
+    }
+  }
+
+  // Serial port icon (bottom)
+  px(sx+r.w-16, sy+r.h-10, 12, 6, '#3a3a5a');
+  px(sx+r.w-14, sy+r.h-8, 8, 2, '#5a5a7a');
+
+  // Ethernet ports (bottom left)
+  px(sx+4, sy+r.h-10, 8, 6, '#2a2a4a');
+  px(sx+14, sy+r.h-10, 8, 6, '#2a2a4a');
+
+  // Highlight border if near/hover
+  if (isHover || isNear) {
+    ctx.strokeStyle='#00ffcc'; ctx.lineWidth=2; ctx.strokeRect(sx-1,sy-1,r.w+2,r.h+2);
+  }
+
+  // Device ID below
+  ctx.font='bold 6px "Courier New"'; ctx.fillStyle='#5a7a8a'; ctx.textAlign='center';
+  ctx.fillText('EIO-01', sx+r.w/2, sy+r.h+8);
+}
+
+function drawPlayer(t) {
+  const sx=player.x-camX, sy=player.y-camY;
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(sx+player.w/2,sy+player.h+2,14,4,0,0,Math.PI*2); ctx.fill();
+
+  const step = player.moving ? Math.sin(t*12)*4 : 0;
+  // Boots
+  px(sx+5,sy+34+Math.max(0,step),8,4,'#1a1a1a');
+  px(sx+15,sy+34+Math.max(0,-step),8,4,'#1a1a1a');
+  // Pants
+  px(sx+7,sy+26+Math.max(0,step)*0.5,6,10,'#2a3a5a');
+  px(sx+15,sy+26+Math.max(0,-step)*0.5,6,10,'#2a3a5a');
+  // Body (hi-vis)
+  px(sx+4,sy+14,20,14,'#ff8800'); px(sx+6,sy+16,16,10,'#ffaa22');
+  px(sx+4,sy+20,20,2,'#cccc00'); px(sx+4,sy+24,20,2,'#cccc00');
+  // Arms
+  const arm=player.moving?Math.sin(t*12)*3:0;
+  px(sx+1,sy+16+arm,5,10,'#ffe0b2'); px(sx+22,sy+16-arm,5,10,'#ffe0b2');
+  // Head
+  px(sx+7,sy+4,14,12,'#ffe0b2');
+  // Eyes
+  if (player.dir!=='up') {
+    const ex=player.dir==='left'?-2:player.dir==='right'?2:0;
+    px(sx+9+ex,sy+8,3,3,'#1a1a2e'); px(sx+16+ex,sy+8,3,3,'#1a1a2e');
+    px(sx+10+ex,sy+9,1,1,'#fff'); px(sx+17+ex,sy+9,1,1,'#fff');
+  }
+  // Hard hat
+  px(sx+5,sy+1,18,5,'#ffcc00'); px(sx+7,sy-1,14,4,'#ffdd44'); px(sx+3,sy+4,22,2,'#eebb00');
+  // ID badge
+  px(sx+18,sy+16,4,5,'#fff'); px(sx+19,sy+17,2,3,'#0066cc');
+  // Name tag above head
+  ctx.font='bold 7px "Courier New"'; ctx.fillStyle='#00ffcc88'; ctx.textAlign='center';
+  ctx.fillText('LEONARD', sx+player.w/2, sy-6);
+  // Chat bubble
+  maybeShowBubble(t);
+  drawChatBubble(t);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  UPDATE & PROXIMITY
+// ═════════════════════════════════════════════════════════════════════════════
+function updatePlayer() {
+  if (interactMachine) { player.moving=false; return; }
+  let dx=0,dy=0;
+  if (keys['w']||keys['arrowup'])    { dy=-player.speed; player.dir='up'; }
+  if (keys['s']||keys['arrowdown'])  { dy= player.speed; player.dir='down'; }
+  if (keys['a']||keys['arrowleft'])  { dx=-player.speed; player.dir='left'; }
+  if (keys['d']||keys['arrowright']) { dx= player.speed; player.dir='right'; }
+  player.moving = dx!==0||dy!==0;
+
+  const nx=player.x+dx, ny=player.y+dy;
+  const blockedX = (x, y) => {
+    for (const mr of machineRects) {
+      if (x+player.w>mr.x-4&&x<mr.x+mr.w+4&&y+player.h>mr.y-4&&y<mr.y+mr.h+4) return true;
+    }
+    if (edgeIORect) {
+      const er=edgeIORect;
+      if (x+player.w>er.x-4&&x<er.x+er.w+4&&y+player.h>er.y-4&&y<er.y+er.h+4) return true;
+    }
+    return false;
+  };
+  const world=getWorldSize();
+  const fx = blockedX(nx, player.y) ? player.x : Math.max(4,Math.min(world.w-player.w-4,nx));
+  const fy = blockedX(fx, ny)       ? player.y : Math.max(4,Math.min(world.h-player.h-4,ny));
+  player.x=fx; player.y=fy;
+  camX=player.x-canvas.width/2+player.w/2;
+  camY=player.y-canvas.height/2+player.h/2;
+}
+
+function checkProximity() {
+  // Check Edge IO proximity
+  if (edgeIORect && edgeIOState) {
+    const pcx=player.x+player.w/2, pcy=player.y+player.h/2;
+    const ecx=edgeIORect.x+edgeIORect.w/2, ecy=edgeIORect.y+edgeIORect.h/2;
+    const dist=Math.sqrt((pcx-ecx)**2+(pcy-ecy)**2);
+    if (dist < INTERACT_DIST) {
+      nearMachine = {device_id:'EIO-01', machine_id:'EIO-01'};
+    }
+  }
+  // Original:
+  if (interactMachine) return;
+  const pcx=player.x+player.w/2, pcy=player.y+player.h/2;
+  nearMachine=null; let minD=INTERACT_DIST;
+  for (const mr of machineRects) {
+    const d=Math.hypot(pcx-mr.x-mr.w/2, pcy-mr.y-mr.h/2);
+    if (d<minD) { minD=d; nearMachine=mr.machine; }
+  }
+}
+
+function drawEPrompt() {
+  if (!nearMachine||interactMachine) return;
+  const mr=machineRects.find(r=>r.machine.machine_id===nearMachine.machine_id);
+  if (!mr) return;
+  const sx=mr.x+mr.w/2-camX, sy=mr.y-20-camY;
+  const bob=Math.sin(performance.now()/400)*3;
+  ctx.fillStyle='rgba(0,8,20,0.85)';
+  ctx.strokeStyle='#00ffcc88'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(sx-34,sy-10+bob); ctx.lineTo(sx+34,sy-10+bob); ctx.arcTo(sx+38,sy-10+bob,sx+38,sy-6+bob,4);
+  ctx.lineTo(sx+38,sy+4+bob); ctx.arcTo(sx+38,sy+8+bob,sx+34,sy+8+bob,4);
+  ctx.lineTo(sx-34,sy+8+bob); ctx.arcTo(sx-38,sy+8+bob,sx-38,sy+4+bob,4);
+  ctx.lineTo(sx-38,sy-6+bob); ctx.arcTo(sx-38,sy-10+bob,sx-34,sy-10+bob,4);
+  ctx.fill(); ctx.stroke();
+  ctx.font='bold 10px "Courier New"'; ctx.fillStyle='#00ffcc'; ctx.textAlign='center';
+  ctx.fillText('[ E ] INTERACT',sx,sy+3+bob);
+}
+
+function checkHover() {
+  // Check Edge IO hover
+  if (edgeIORect && edgeIOState) {
+    const ex=edgeIORect.x-camX, ey=edgeIORect.y-camY;
+    if (mouseX>=ex && mouseX<=ex+edgeIORect.w && mouseY>=ey && mouseY<=ey+edgeIORect.h) {
+      hoveredMachine = {device_id:'EIO-01', machine_id:'EIO-01', state:edgeIOState.online?'online':'offline',
+        telemetry:{'AI0_mA':edgeIOState.analog_inputs?.AI0?.value||0,'AI1_mm_s':edgeIOState.analog_inputs?.AI1?.value||0},
+        errors:[]};
+      return;
+    }
+  }
+  // Original:
+  const wx=mouseX+camX, wy=mouseY+camY;
+  hoveredMachine=null;
+  for (const mr of machineRects) {
+    if (wx>=mr.x&&wx<=mr.x+mr.w&&wy>=mr.y&&wy<=mr.y+mr.h) { hoveredMachine=mr.machine; break; }
+  }
+  updateTooltip();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TOOLTIP
+// ═════════════════════════════════════════════════════════════════════════════
+function updateTooltip() {
+  const tip=document.getElementById('tooltip');
+  if (!hoveredMachine||interactMachine) { tip.style.display='none'; return; }
+  const m=hoveredMachine, tel=m.telemetry, sc='st-'+m.state.toLowerCase();
+  const rows=Object.entries(tel).map(([k,v])=>{
+    const val=typeof v==='number'?v.toFixed(2):v;
+    const label=k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    return `<div class="tt-row"><span class="tt-label">${label}</span><span class="tt-val">${val}</span></div>`;
+  }).join('');
+  const faults=m.errors.length>0?`<div class="tt-faults">⚠ ${m.errors.length} fault(s): ${m.errors.map(e=>e.code).join(', ')}</div>`:'';
+  tip.innerHTML=`<div class="tt-id">${m.machine_id}</div><div class="tt-state ${sc}">${m.state}</div>${rows}${faults}<div class="tt-hint">Press E to interact</div>`;
+  tip.style.display='block';
+  tip.style.left=Math.min(mouseX+16,window.innerWidth-240)+'px';
+  tip.style.top=Math.min(mouseY-10,window.innerHeight-tip.offsetHeight-10)+'px';
+}
+canvas.addEventListener('mousemove',e=>{ mouseX=e.clientX; mouseY=e.clientY; });
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  INTERACTION PANEL
+// ═════════════════════════════════════════════════════════════════════════════
+const FAULT_TYPES=['overtemp','high_vibration','low_oil','cycle_timeout','spindle_fault','tool_wear','estop','comm_loss','feed_jam','low_coolant','motor_thermal','encoder_loss'];
+const STATES=['running','idle','stopped','maintenance','fault'];
+const SLIDER_CFG={
+  temperature_c:{label:'Temperature',unit:'°C',min:15,max:120,step:0.5},
+  vibration_mm_s:{label:'Vibration',unit:'mm/s',min:0,max:10,step:0.01},
+  current_a:{label:'Current',unit:'A',min:0,max:30,step:0.1},
+  spindle_rpm:{label:'Spindle RPM',unit:'RPM',min:0,max:15000,step:10},
+  feed_rate:{label:'Feed Rate',unit:'mm/m',min:0,max:500,step:1},
+  oil_pressure_psi:{label:'Oil Pressure',unit:'PSI',min:0,max:100,step:0.5},
+  coolant_temp_c:{label:'Coolant Temp',unit:'°C',min:10,max:60,step:0.5},
+  cycle_time_s:{label:'Cycle Time',unit:'s',min:0,max:120,step:0.1},
+  power_kw:{label:'Power',unit:'kW',min:0,max:50,step:0.1},
+  load_pct:{label:'Load',unit:'%',min:0,max:100,step:1},
+  belt_speed_m_s:{label:'Belt Speed',unit:'m/s',min:0,max:5,step:0.01},
+  item_count:{label:'Item Count',unit:'',min:0,max:9999,step:1},
+};
+
+function openInteract(machine) {
+  interactMachine=machine;
+  document.getElementById('overlay').style.display='block';
+  document.getElementById('tooltip').style.display='none';
+  renderInteractPanel();
+}
+function closeInteract() {
+  if (slidersUnlocked && interactMachine) {
+    sendCommand([{action:'unlock_telemetry',target:interactMachine.machine_id}]);
+  }
+  slidersUnlocked=false;
+  interactMachine=null;
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('interact-panel').style.display='none';
+}
+document.getElementById('overlay').addEventListener('click', () => { if(interactEdgeIO) closeEdgeIOInteract(); else closeInteract(); });
+
+function renderInteractPanel() {
+  if (!interactMachine) return;
+  const m=interactMachine, panel=document.getElementById('interact-panel');
+  panel.style.display='block';
+  const sc='st-'+m.state.toLowerCase();
+  const pills=STATES.map(s=>`<button class="ip-pill pill-${s} ${m.state.toLowerCase()===s?'active':''}" onclick="cmdSetState('${m.machine_id}','${s}')">${s}</button>`).join('');
+  const lockRow=`<div class="ip-lock-row"><span class="ip-lock-label">${slidersUnlocked?'🔓 Manual Override Active':'🔒 Algorithm Control'}</span><span class="ip-lock-status ${slidersUnlocked?'unlocked':'locked'}">${slidersUnlocked?'UNLOCKED':'LOCKED'}</span><button class="ip-lock-btn ${slidersUnlocked?'unlocked':'locked'}" onclick="toggleSliderLock()">${slidersUnlocked?'Lock':'Unlock'}</button></div>`;
+  const sliders=Object.entries(m.telemetry).map(([k,v])=>{
+    const cfg=SLIDER_CFG[k]||{label:k.replace(/_/g,' '),unit:'',min:0,max:(v*3)||100,step:0.1};
+    const nv=typeof v==='number'?v:0;
+    const dis=slidersUnlocked?'':'disabled';
+    return `<div class="ip-slider-row"><div class="ip-slider-head"><span class="ip-slider-label">${cfg.label}</span><span class="ip-slider-val"><span id="sv-${k}">${nv.toFixed(2)}</span><span class="unit">${cfg.unit}</span></span></div><input type="range" class="ip-slider ${dis}" id="sl-${k}" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${nv}" ${dis} oninput="onSlider('${k}',this.value)"></div>`;
+  }).join('');
+  const faults=m.errors.length>0?m.errors.map(e=>`<div class="ip-fault-item"><span class="ip-fault-code">${e.code}</span><span class="ip-fault-msg">${e.message}</span></div>`).join('')+`<button class="ip-ack-all" onclick="cmdAckFaults('${m.machine_id}')">⚡ Acknowledge All Faults</button>`:'<div style="color:#5a7a8a;font-size:10px;">No active faults</div>';
+  const inject=FAULT_TYPES.map(ft=>`<button class="ip-inject-btn" onclick="cmdInjectFault('${m.machine_id}','${ft}')">${ft.replace(/_/g,' ')}</button>`).join('');
+
+  panel.innerHTML=`
+    <div class="ip-header"><span class="ip-title">🔧 ${m.machine_id}</span><div style="display:flex;align-items:center;gap:10px;"><span class="tt-state ${sc}">${m.state}</span><button class="ip-close" onclick="closeInteract()">✕ ESC</button></div></div>
+    <div class="ip-section"><div class="ip-section-title">Machine State</div><div class="ip-pills">${pills}</div></div>
+    <div class="ip-section"><div class="ip-section-title">Live Telemetry</div>${lockRow}${sliders}</div>
+    <div class="ip-section"><div class="ip-section-title">Active Faults (${m.errors.length})</div><div class="ip-fault-list">${faults}</div></div>
+    <div class="ip-section"><div class="ip-section-title">Inject Fault (Testing)</div><div class="ip-inject-row">${inject}</div></div>`;
+}
+function syncInteractPanel() {
+  if (!interactMachine||!plantState) return;
+  for (const line of plantState.lines) for (const m of line.machines) if (m.machine_id===interactMachine.machine_id) { interactMachine=m; renderInteractPanel(); return; }
+}
+function onSlider(key,val) {
+  const el=document.getElementById('sv-'+key);
+  if(el) el.textContent=parseFloat(val).toFixed(2);
+  if(slidersUnlocked && interactMachine) {
+    sendCommand([{action:'set_telemetry',target:interactMachine.machine_id,key:key,value:parseFloat(val)}]);
+  }
+}
+
+function toggleSliderLock() {
+  if (!interactMachine) return;
+  slidersUnlocked = !slidersUnlocked;
+  if (!slidersUnlocked) {
+    sendCommand([{action:'unlock_telemetry',target:interactMachine.machine_id}]);
+  }
+  renderInteractPanel();
+}
+
+async function sendCommand(commands) {
+  try { await (await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commands})})).json(); } catch(e){ console.error(e); }
+}
+function cmdSetState(t,s){ sendCommand([{action:'set_state',target:t,state:s}]); }
+function cmdAckFaults(t){ sendCommand([{action:'ack_faults',target:t},{action:'set_state',target:t,state:'running'}]); }
+function cmdInjectFault(t,ft){ sendCommand([{action:'inject_fault',target:t,fault_type:ft}]); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  GAME LOOP
+// ═════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+//  EDGE IO INTERACTION PANEL
+// ═════════════════════════════════════════════════════════════════════════════
+function openEdgeIOInteract() {
+  interactEdgeIO = true;
+  document.getElementById('overlay').style.display='block';
+  document.getElementById('tooltip').style.display='none';
+  renderEdgeIOPanel();
+}
+function closeEdgeIOInteract() {
+  interactEdgeIO = false;
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('interact-panel').style.display='none';
+}
+
+function renderEdgeIOPanel() {
+  if (!edgeIOState) return;
+  const e = edgeIOState, panel = document.getElementById('interact-panel');
+  panel.style.display='block';
+
+  // GPIO DI rows
+  const diRows = Object.entries(e.digital_inputs).map(([k,v]) => {
+    const pin = parseInt(k.replace('DI',''));
+    const cls = v.value ? 'eio-on' : 'eio-off';
+    const ovr = v.override ? ' (manual)' : '';
+    return `<div class="eio-pin-row">
+      <span class="eio-pin-id">${k}</span>
+      <span class="eio-pin-label">${v.label}</span>
+      <span class="eio-led ${cls}"></span>
+      <button class="eio-pin-btn" onclick="eioSetDI(${pin},true)">HIGH</button>
+      <button class="eio-pin-btn" onclick="eioSetDI(${pin},false)">LOW</button>
+      <button class="eio-pin-btn eio-auto" onclick="eioClearDI(${pin})">AUTO</button>
+      <span class="eio-ovr">${ovr}</span>
+    </div>`;
+  }).join('');
+
+  // GPO rows
+  const doRows = Object.entries(e.digital_outputs).map(([k,v]) => {
+    const pin = parseInt(k.replace('DO',''));
+    const cls = v.value ? 'eio-on' : 'eio-off';
+    return `<div class="eio-pin-row">
+      <span class="eio-pin-id">${k}</span>
+      <span class="eio-pin-label">${v.label}</span>
+      <span class="eio-led ${cls}"></span>
+      <button class="eio-pin-btn" onclick="eioSetDO(${pin},true)">ON</button>
+      <button class="eio-pin-btn" onclick="eioSetDO(${pin},false)">OFF</button>
+    </div>`;
+  }).join('');
+
+  // Analog readings
+  const aiRows = Object.entries(e.analog_inputs).map(([k,v]) =>
+    `<div class="eio-ai-row"><span class="eio-ai-id">${k}</span><span class="eio-ai-label">${v.label}</span><span class="eio-ai-val">${v.value.toFixed(2)}</span></div>`
+  ).join('');
+
+  // Light Kit controls
+  const lkRows = e.light_kit.map((lk,i) => {
+    const modes = ['off','solid','pulse','chase','pick_to_light'];
+    const modeButtons = modes.map(m =>
+      `<button class="eio-lk-mode ${lk.mode===m?'active':''}" onclick="eioSetLK(${i},'${m}',null)">${m}</button>`
+    ).join('');
+    return `<div class="eio-lk-section">
+      <div class="eio-lk-head">Channel ${i} <span class="eio-lk-preview" style="background:${lk.color};opacity:${lk.mode==='off'?0.2:0.9}"></span></div>
+      <div class="eio-lk-modes">${modeButtons}</div>
+      <div class="eio-lk-color-row">Color: <input type="color" value="${lk.color}" onchange="eioSetLK(${i},null,this.value)">
+        <input type="range" min="0" max="100" value="${Math.round(lk.brightness*100)}" class="eio-lk-bright" onchange="eioSetLKBright(${i},this.value/100)">
+        <span>${Math.round(lk.brightness*100)}%</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Serial
+  const serialInfo = `<div class="eio-serial-row">
+    <span class="eio-serial-label">${e.serial.port_type} @ ${e.serial.baud_rate} baud</span>
+    <span class="eio-serial-data">${e.serial.last_data || '—'}</span>
+    <button class="eio-pin-btn" onclick="eioTriggerScan()">📷 Scan</button>
+  </div>`;
+
+  panel.innerHTML = `
+    <div class="ip-header">
+      <span class="ip-title">🔌 Edge IO — ${e.device_id}</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="tt-state st-${e.online?'running':'fault'}">${e.online?'ONLINE':'OFFLINE'}</span>
+        <span style="color:#5a7a8a;font-size:9px;">FW: ${e.firmware} · Up: ${Math.round(e.uptime_s)}s</span>
+        <button class="ip-close" onclick="closeEdgeIOInteract()">✕ ESC</button>
+      </div>
+    </div>
+    <div class="ip-section"><div class="ip-section-title">Digital Inputs (GPIO)</div>${diRows}</div>
+    <div class="ip-section"><div class="ip-section-title">Digital Outputs (GPO)</div>${doRows}</div>
+    <div class="ip-section"><div class="ip-section-title">Analog Inputs</div>${aiRows}</div>
+    <div class="ip-section"><div class="ip-section-title">Light Kit</div>${lkRows}</div>
+    <div class="ip-section"><div class="ip-section-title">Serial Port</div>${serialInfo}</div>
+    <div class="ip-section"><div class="ip-section-title">Device</div>
+      <div style="display:flex;gap:8px;">
+        <button class="eio-pin-btn" onclick="eioToggleOnline()" style="background:${e.online?'#ff4444':'#00cc66'};color:#fff;">${e.online?'Power Off':'Power On'}</button>
+        <span style="color:#5a7a8a;font-size:9px;align-self:center;">Linked: ${e.linked_machine||'none'}</span>
+      </div>
+    </div>`;
+}
+
+async function eioCmd(action, params={}) {
+  try {
+    await fetch('/api/edge-io/EIO-01/command', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action, ...params})
+    });
+  } catch(e) { console.error(e); }
+}
+function eioSetDI(pin,val) { eioCmd('set_di', {pin,value:val}); }
+function eioClearDI(pin) { eioCmd('clear_di_override', {pin}); }
+function eioSetDO(pin,val) { eioCmd('set_do', {pin,value:val}); }
+function eioSetLK(ch,mode,color) { eioCmd('set_lightkit', {channel:ch,mode:mode,color:color}); }
+function eioSetLKBright(ch,val) { eioCmd('set_lightkit', {channel:ch,brightness:val}); }
+function eioTriggerScan() { eioCmd('trigger_scan'); }
+function eioToggleOnline() { eioCmd('toggle_online'); }
+
+// Sync Edge IO panel
+function syncEdgeIOPanel() {
+  if (interactEdgeIO && edgeIOState) renderEdgeIOPanel();
+}
+
+let _fps=0,_fpsFrames=0,_fpsLast=performance.now();
+function gameLoop(ts) {
+  _fpsFrames++;
+  if(ts-_fpsLast>=1000){_fps=_fpsFrames;_fpsFrames=0;_fpsLast=ts;}
+  const t=ts/1000;
+  updatePlayer(); checkProximity(); checkHover();
+  drawFloor(t); drawLineLabels(); drawMachines(t); drawEdgeIO(t); drawPlayer(t); drawEPrompt();
+  // Crosshair
+  ctx.fillStyle='#00ffcc66';
+  ctx.fillRect(mouseX-5,mouseY,11,1); ctx.fillRect(mouseX,mouseY-5,1,11);
+  ctx.fillStyle=_fps<30?'#ff3333':'#00ff66';
+  ctx.font='bold 12px monospace';
+  ctx.textAlign='left';
+  ctx.fillText(_fps+' FPS',10,20);
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  WEBSOCKET
+// ═════════════════════════════════════════════════════════════════════════════
+function connectWS() {
+  const ws=new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen=()=>{ document.getElementById('hud-conn').innerHTML='<span style="color:#00ff66;">● CONNECTED</span>'; };
+  ws.onmessage=(e)=>{
+    const msg=JSON.parse(e.data);
+    if (msg.type==='plant_state') {
+      const first=!plantState; plantState=msg;
+      if (first) { layoutFactory(); player.x=PAD+80; player.y=PAD+40+MH+40; }
+      machineRects.forEach(mr=>{ for(const l of plantState.lines) for(const m of l.machines) if(m.machine_id===mr.machine.machine_id) mr.machine=m; });
+      if(msg.edge_devices && msg.edge_devices.length) edgeIOState=msg.edge_devices[0];
+      syncInteractPanel(); syncEdgeIOPanel();
+    }
+  };
+  ws.onclose=()=>{ document.getElementById('hud-conn').innerHTML='<span style="color:#ff4444;">● DISCONNECTED</span>'; setTimeout(connectWS,3000); };
+}
+connectWS();
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CHAT
+// ═════════════════════════════════════════════════════════════════════════════
+function addChat(type,sender,text) {
+  const el=document.getElementById('chat-msgs'), div=document.createElement('div');
+  div.className=`cm cm-${type}`; div.innerHTML=`<strong>${sender}:</strong> ${text}`;
+  el.appendChild(div); el.scrollTop=el.scrollHeight;
+}
+async function sendChat() {
+  const input=document.getElementById('chat-input'), msg=input.value.trim();
+  if(!msg) return; input.value=''; addChat('user','You',msg);
+  document.getElementById('chat-send').disabled=true;
+  try {
+    const snap=plantState?{summary:plantState.summary,machine_ids:plantState.lines.flatMap(l=>l.machines.map(m=>m.machine_id))}:{summary:'unknown',machine_ids:[]};
+    const systemPrompt=`You are an AI operator controlling a manufacturing plant simulation.
+Current plant: ${JSON.stringify(snap.summary)}
+Machine IDs: ${snap.machine_ids.join(', ')}
+You MUST respond with ONLY a single JSON object — no markdown, no explanation outside the JSON:
+{"message":"brief human-readable explanation","commands":[{"action":"set_state","target":"<machine_id|line:L1|all>","state":"running|idle|stopped|maintenance|fault"},{"action":"inject_fault","target":"<machine_id|line:L1|all>","fault_type":"overtemp|high_vibration|low_oil|cycle_timeout|spindle_fault|tool_wear|estop|comm_loss|feed_jam|low_coolant|motor_thermal|encoder_loss"},{"action":"ack_faults","target":"<machine_id|all>"},{"action":"maintenance","target":"<machine_id>"}]}
+RECOVERY PATTERN: To fix/recover/restart a faulted machine, ALWAYS send TWO commands: 1) {"action":"ack_faults","target":"<id>"} 2) {"action":"set_state","target":"<id>","state":"running"}. Return empty commands [] for informational questions.`;
+    const resp=await fetch(OLLAMA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:OLLAMA_MODEL,stream:false,messages:[{role:'system',content:systemPrompt},{role:'user',content:msg}]})});
+    const data=await resp.json(), raw=data.message?.content||'{}', clean=raw.replace(/```json|```/g,'').trim(), parsed=JSON.parse(clean);
+    addChat('ai','AI',parsed.message||'Done.');
+    if(parsed.commands?.length){const r=await(await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commands:parsed.commands})})).json();addChat('sys','System',`${r.executed} command(s) executed`);}
+  } catch(err){ addChat('err','Error',err.message); }
+  finally{ document.getElementById('chat-send').disabled=false; }
+}
+document.getElementById('chat-send').addEventListener('click',sendChat);
+document.getElementById('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); e.stopPropagation(); });
+document.getElementById('chat-input').addEventListener('keyup',e=>e.stopPropagation());
+</script>
+</body>
+</html>
