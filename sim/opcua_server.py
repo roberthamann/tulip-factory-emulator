@@ -32,9 +32,11 @@ class OPCUAServer:
                 self._node_map[machine.machine_id] = {}
 
                 data = machine.to_dict()
+                tel = data["telemetry"]
                 tags = {
                     "State": data["state"],
-                    **{k: float(v) for k, v in data["telemetry"].items()},
+                    "ActiveFault": tel.pop("active_fault", ""),
+                    **{k: float(v) for k, v in tel.items()},
                     "ActiveFaultCount": float(len(machine.errors)),
                 }
 
@@ -52,9 +54,11 @@ class OPCUAServer:
             for machine in self.plant.all_machines:
                 nodes = self._node_map.get(machine.machine_id, {})
                 data = machine.to_dict()
+                tel = data["telemetry"]
                 updates = {
                     "State": data["state"],
-                    **{k: float(v) for k, v in data["telemetry"].items()},
+                    "ActiveFault": tel.pop("active_fault", ""),
+                    **{k: float(v) for k, v in tel.items()},
                     "ActiveFaultCount": float(len(machine.errors)),
                 }
                 for tag, value in updates.items():

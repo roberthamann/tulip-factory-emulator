@@ -52,6 +52,7 @@ FAULT_NAMES = {
     "estop": "E007", "comm_loss": "E008", "feed_jam": "E009",
     "low_coolant": "E010", "motor_thermal": "E011", "encoder_loss": "E012",
 }
+FAULT_CODE_TO_NAME = {v: k for k, v in FAULT_NAMES.items()}
 
 
 TELEMETRY_ATTR_MAP = {
@@ -105,16 +106,6 @@ class BaseMachine:
     def hours_since_maintenance(self) -> float:
         return (time.time() - self.last_maintenance) / 3600
 
-    @property
-    def oee(self) -> float:
-        quality = 1.0 - (self.failed_cycles / max(self.total_cycles, 1))
-        availability = {
-            MachineState.RUNNING: 1.0,
-            MachineState.IDLE: 0.5,
-            MachineState.WARMING_UP: 0.3,
-        }.get(self.state, 0.0)
-        performance = min(1.0, self.throughput / max(self.nominal_throughput, 1))
-        return round(quality * availability * performance * 100, 1)
 
     def inject_fault(self, fault_name_or_code: str) -> Optional[MachineError]:
         """Inject a fault by name (e.g. 'overtemp') or code (e.g. 'E001')."""
@@ -238,11 +229,11 @@ class BaseMachine:
                 "oil_pressure_bar": round(self.oil_pressure, 2),
                 "cycle_time_s": round(self.cycle_time, 2),
                 "throughput_pph": round(self.throughput, 1),
-                "oee_pct": self.oee,
                 "uptime_s": round(self.uptime_s),
                 "total_cycles": round(self.total_cycles),
                 "tool_wear_pct": round(self.tool_wear_pct, 1),
                 "hours_since_maintenance": round(self.hours_since_maintenance, 1),
+                "active_fault": ",".join(FAULT_CODE_TO_NAME.get(e.code, e.code) for e in self.errors) if self.errors else "",
             },
             "errors": [e.to_dict() for e in self.errors[-5:]],
             "timestamp": time.time(),

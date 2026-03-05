@@ -105,24 +105,6 @@
   .ip-inject-btn { background: rgba(255,50,50,0.1); color: #ff6666; border: 1px solid #ff333322; border-radius: 4px; padding: 4px 8px; font-family: inherit; font-size: 9px; cursor: pointer; }
   .ip-inject-btn:hover { background: rgba(255,50,50,0.25); border-color: #ff3333; }
 
-  #chat-panel {
-    position: fixed; bottom: 12px; right: 12px; z-index: 50;
-    width: 340px; background: rgba(0,8,20,0.92); border: 1px solid #00ffcc33;
-    border-radius: 6px; display: flex; flex-direction: column; max-height: 300px;
-  }
-  #chat-panel .ch-title { padding: 6px 12px; font-size: 10px; color: #00ffcc; border-bottom: 1px solid #00ffcc22; }
-  #chat-msgs { flex: 1; overflow-y: auto; padding: 8px 12px; font-size: 10px; color: #c8d6e5; min-height: 100px; max-height: 200px; }
-  #chat-msgs::-webkit-scrollbar { width: 3px; }
-  #chat-msgs::-webkit-scrollbar-thumb { background: #00ffcc33; }
-  .cm { margin-bottom: 4px; line-height: 1.5; }
-  .cm-user { color: #00ccff; }
-  .cm-ai { color: #00ff88; }
-  .cm-sys { color: #666; }
-  .cm-err { color: #ff4444; }
-  #chat-input-row { display: flex; border-top: 1px solid #00ffcc22; }
-  #chat-input { flex: 1; background: transparent; border: none; color: #fff; font-family: inherit; font-size: 11px; padding: 8px 12px; outline: none; }
-  #chat-send { background: #00ffcc; color: #000; border: none; padding: 8px 14px; font-family: inherit; font-size: 10px; font-weight: bold; cursor: pointer; }
-  #chat-send:hover { background: #33ffdd; }
 
   #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 190; display: none; }
 .eio-pin-row { display:flex; align-items:center; gap:6px; padding:3px 0; border-bottom:1px solid #1a2a3a; font-size:10px; }
@@ -168,21 +150,10 @@
   <span id="hud-conn" style="color:#ff4444;">● CONNECTING...</span>
 </div>
 
-<div id="chat-panel">
-  <div class="ch-title">🤖 AI OPERATOR</div>
-  <div id="chat-msgs"><div class="cm cm-sys">Type a command to control the factory...</div></div>
-  <div id="chat-input-row">
-    <input id="chat-input" type="text" placeholder="e.g. shut down Line 2..." />
-    <button id="chat-send">SEND</button>
-  </div>
-</div>
 
 <script>
 // ═════════════════════════════════════════════════════════════════════════════
 const TILE = 48;
-const OLLAMA_URL   = 'http://localhost:11434/api/chat';
-const OLLAMA_MODEL = 'mistral';
-
 const canvas = document.getElementById('game');
 const ctx    = canvas.getContext('2d');
 canvas.width  = window.innerWidth;
@@ -1380,36 +1351,6 @@ function connectWS() {
 }
 connectWS();
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  CHAT
-// ═════════════════════════════════════════════════════════════════════════════
-function addChat(type,sender,text) {
-  const el=document.getElementById('chat-msgs'), div=document.createElement('div');
-  div.className=`cm cm-${type}`; div.innerHTML=`<strong>${sender}:</strong> ${text}`;
-  el.appendChild(div); el.scrollTop=el.scrollHeight;
-}
-async function sendChat() {
-  const input=document.getElementById('chat-input'), msg=input.value.trim();
-  if(!msg) return; input.value=''; addChat('user','You',msg);
-  document.getElementById('chat-send').disabled=true;
-  try {
-    const snap=plantState?{summary:plantState.summary,machine_ids:plantState.lines.flatMap(l=>l.machines.map(m=>m.machine_id))}:{summary:'unknown',machine_ids:[]};
-    const systemPrompt=`You are an AI operator controlling a manufacturing plant simulation.
-Current plant: ${JSON.stringify(snap.summary)}
-Machine IDs: ${snap.machine_ids.join(', ')}
-You MUST respond with ONLY a single JSON object — no markdown, no explanation outside the JSON:
-{"message":"brief human-readable explanation","commands":[{"action":"set_state","target":"<machine_id|line:L1|all>","state":"running|idle|stopped|maintenance|fault"},{"action":"inject_fault","target":"<machine_id|line:L1|all>","fault_type":"overtemp|high_vibration|low_oil|cycle_timeout|spindle_fault|tool_wear|estop|comm_loss|feed_jam|low_coolant|motor_thermal|encoder_loss"},{"action":"ack_faults","target":"<machine_id|all>"},{"action":"maintenance","target":"<machine_id>"}]}
-RECOVERY PATTERN: To fix/recover/restart a faulted machine, ALWAYS send TWO commands: 1) {"action":"ack_faults","target":"<id>"} 2) {"action":"set_state","target":"<id>","state":"running"}. Return empty commands [] for informational questions.`;
-    const resp=await fetch(OLLAMA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:OLLAMA_MODEL,stream:false,messages:[{role:'system',content:systemPrompt},{role:'user',content:msg}]})});
-    const data=await resp.json(), raw=data.message?.content||'{}', clean=raw.replace(/```json|```/g,'').trim(), parsed=JSON.parse(clean);
-    addChat('ai','AI',parsed.message||'Done.');
-    if(parsed.commands?.length){const r=await(await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commands:parsed.commands})})).json();addChat('sys','System',`${r.executed} command(s) executed`);}
-  } catch(err){ addChat('err','Error',err.message); }
-  finally{ document.getElementById('chat-send').disabled=false; }
-}
-document.getElementById('chat-send').addEventListener('click',sendChat);
-document.getElementById('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); e.stopPropagation(); });
-document.getElementById('chat-input').addEventListener('keyup',e=>e.stopPropagation());
 </script>
 </body>
 </html>

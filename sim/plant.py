@@ -11,17 +11,10 @@ class ProductionLine:
         self.name = name
         self.machines = machines
 
-    @property
-    def avg_oee(self) -> float:
-        if not self.machines:
-            return 0.0
-        return sum(m.oee for m in self.machines) / len(self.machines)
-
     def to_dict(self) -> Dict[str, Any]:
         return {
             "line_id": self.line_id,
             "name": self.name,
-            "avg_oee": round(self.avg_oee, 1),
             "machines": [m.to_dict() for m in self.machines],
         }
 
@@ -67,7 +60,6 @@ class Plant:
             "stopped": states.count("stopped"),
             "faulted": states.count("fault"),
             "maintenance": states.count("maintenance"),
-            "avg_oee_pct": round(sum(m.oee for m in all_m) / max(len(all_m), 1), 1),
             "total_throughput_pph": round(sum(m.throughput for m in all_m), 1),
             "total_power_kw": round(sum(m.power_kw for m in all_m), 1),
             "active_alerts": sum(len(m.errors) for m in all_m),

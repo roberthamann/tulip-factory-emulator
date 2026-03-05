@@ -1,0 +1,12 @@
+{
+  "name": "opcua-bridge",
+  "version": "1.0.0",
+  "description": "OPC UA bridge — mirrors factory sim (:4840 REST) to OPC UA :4841 for Tulip Connector Host",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js"
+  },
+  "dependencies": {
+    "node-opcua": "^2.119.0"
+  }
+}

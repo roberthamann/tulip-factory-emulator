@@ -7,7 +7,6 @@ from sim.plant import Plant
 from sim.opcua_server import OPCUAServer
 from sim.mqtt_publisher import MQTTPublisher
 from sim.edge_io import EdgeIODevice
-from sim.ai_brain import AIBrain
 from dashboard.server import app, broadcast_plant_state
 import dashboard.server as dashboard_module
 
@@ -62,13 +61,10 @@ async def main():
     print("=" * 60)
 
     # Run all services concurrently
-    brain = AIBrain(plant, interval=45)
-
     await asyncio.gather(
         plant.run(),
         opcua.start(),
         mqtt.run(),
-        brain.run(),
         uvicorn_server.serve(),
     )
 
