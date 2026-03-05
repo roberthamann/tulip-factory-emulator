@@ -29,17 +29,19 @@ else
 fi
 
 # Virtual environment
-if [ ! -d "venv" ]; then
-  echo -e "${RED}  ✗ venv not found — run: python3 -m venv venv${NC}"; FAIL=1
+if [ ! -f "venv/bin/python3" ]; then
+  echo -e "${RED}  ✗ venv not found — run: python3 -m venv venv && pip install -r requirements.txt${NC}"; FAIL=1
+  VENV_PY="python3"
 else
   echo -e "${GREEN}  ✓ venv exists${NC}"
   source venv/bin/activate
+  VENV_PY="venv/bin/python3"
 fi
 
 # Python dependencies
-for pkg in asyncua aiohttp fastapi uvicorn websockets paho; do
-  if ! python3 -c "import $pkg" 2>/dev/null; then
-    echo -e "${RED}  ✗ Python package '$pkg' missing — pip install it${NC}"; FAIL=1
+for pkg in asyncua aiohttp fastapi uvicorn websockets paho.mqtt; do
+  if ! $VENV_PY -c "import $pkg" 2>/dev/null; then
+    echo -e "${RED}  ✗ Python package '$pkg' missing — run: pip install -r requirements.txt${NC}"; FAIL=1
   else
     echo -e "${GREEN}  ✓ $pkg${NC}"
   fi
