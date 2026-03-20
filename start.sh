@@ -98,6 +98,7 @@ echo -e "${GREEN}▸ All preflight checks passed!${NC}\n"
 # ─────────────────────────────────────────────────────────────────
 echo -e "${YELLOW}▸ Cleaning up previous instances...${NC}"
 pkill -f "python3.*main.py" 2>/dev/null || true
+pkill -f "Python.*main.py" 2>/dev/null || true
 pkill -f "node.*bridge" 2>/dev/null || true
 sleep 1
 
@@ -107,8 +108,11 @@ sleep 1
 echo -e "${CYAN}▸ [1/5] Mosquitto MQTT Broker${NC}"
 if docker ps --format '{{.Names}}' | grep -q '^mosquitto$'; then
   echo -e "${GREEN}  ✓ Already running${NC}"
+elif docker ps -a --format '{{.Names}}' | grep -q '^mosquitto$'; then
+  echo -e "${YELLOW}  ⚠ Container stopped — restarting${NC}"
+  docker start mosquitto
+  echo -e "${GREEN}  ✓ Restarted on :1883${NC}"
 else
-  docker rm -f mosquitto 2>/dev/null || true
   docker run -d \
     --name mosquitto \
     -p 1883:1883 \
@@ -124,8 +128,11 @@ fi
 echo -e "${CYAN}▸ [2/5] Node-RED${NC}"
 if docker ps --format '{{.Names}}' | grep -q '^nodered$'; then
   echo -e "${GREEN}  ✓ Already running${NC}"
+elif docker ps -a --format '{{.Names}}' | grep -q '^nodered$'; then
+  echo -e "${YELLOW}  ⚠ Container stopped — restarting${NC}"
+  docker start nodered
+  echo -e "${GREEN}  ✓ Restarted on :1880${NC}"
 else
-  docker rm -f nodered 2>/dev/null || true
   docker run -d \
     --name nodered \
     -p 1880:1880 \
@@ -151,7 +158,11 @@ fi
 # ─────────────────────────────────────────────────────────────────
 echo -e "${CYAN}▸ [4/4] Factory Simulation${NC}"
 
+# Create logs dir
+mkdir -p logs
+
 # Start OPC UA bridge (Node.js)
+BRIDGE_PID=""
 if [ -d "opcua-bridge" ]; then
   echo -e "  Starting OPC UA bridge on :4841..."
   cd opcua-bridge
@@ -159,18 +170,42 @@ if [ -d "opcua-bridge" ]; then
   BRIDGE_PID=$!
   cd "$DIR"
   echo -e "${GREEN}  ✓ OPC UA bridge PID $BRIDGE_PID${NC}"
+  # Watchdog: restart bridge if it exits
+  (
+    while true; do
+      sleep 15
+      if ! kill -0 "$BRIDGE_PID" 2>/dev/null; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [watchdog] OPC UA bridge exited — restarting..." | tee -a logs/opcua-bridge.log
+        cd "$DIR/opcua-bridge"
+        nohup node bridge.js >> "$DIR/logs/opcua-bridge.log" 2>&1 &
+        BRIDGE_PID=$!
+        cd "$DIR"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [watchdog] Restarted as PID $BRIDGE_PID" | tee -a logs/opcua-bridge.log
+      fi
+    done
+  ) &
 else
   echo -e "${YELLOW}  ⚠ opcua-bridge/ not found — skipping Node.js bridge${NC}"
 fi
 
-# Create logs dir
-mkdir -p logs
-
 # Start Python factory sim (OPC UA :4840 + Web :3000)
 echo -e "  Starting factory sim on :3000 (OPC UA :4840)..."
-nohup python3 main.py > logs/factory-sim.log 2>&1 &
+nohup venv/bin/python3 main.py > logs/factory-sim.log 2>&1 &
 SIM_PID=$!
 echo -e "${GREEN}  ✓ Factory sim PID $SIM_PID${NC}"
+# Watchdog: restart sim if it exits
+(
+  while true; do
+    sleep 15
+    if ! kill -0 "$SIM_PID" 2>/dev/null; then
+      echo "$(date '+%Y-%m-%d %H:%M:%S') [watchdog] Factory sim exited — restarting..." | tee -a logs/factory-sim.log
+      cd "$DIR"
+      nohup venv/bin/python3 main.py >> logs/factory-sim.log 2>&1 &
+      SIM_PID=$!
+      echo "$(date '+%Y-%m-%d %H:%M:%S') [watchdog] Restarted as PID $SIM_PID" | tee -a logs/factory-sim.log
+    fi
+  done
+) &
 
 # ─────────────────────────────────────────────────────────────────
 #  WAIT FOR SERVICES
