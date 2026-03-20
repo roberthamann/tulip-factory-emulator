@@ -16,6 +16,25 @@ echo -e "${CYAN}  FACTORY HYBRID — STARTUP SEQUENCE${NC}"
 echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 
 # ─────────────────────────────────────────────────────────────────
+#  UPDATE CHECK
+# ─────────────────────────────────────────────────────────────────
+if command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null; then
+  echo -e "\n${YELLOW}▸ Checking for updates...${NC}"
+  if git fetch --quiet 2>/dev/null; then
+    LOCAL=$(git rev-parse HEAD)
+    REMOTE=$(git rev-parse "@{u}" 2>/dev/null || echo "")
+    if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+      BEHIND=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo "0")
+      echo -e "${YELLOW}  ⚠ $BEHIND new commit(s) available on remote — run: git pull${NC}"
+    else
+      echo -e "${GREEN}  ✓ Up to date${NC}"
+    fi
+  else
+    echo -e "${YELLOW}  ⚠ Could not reach remote (offline?) — skipping update check${NC}"
+  fi
+fi
+
+# ─────────────────────────────────────────────────────────────────
 #  PREFLIGHT CHECKS
 # ─────────────────────────────────────────────────────────────────
 echo -e "\n${YELLOW}▸ Preflight checks...${NC}"
