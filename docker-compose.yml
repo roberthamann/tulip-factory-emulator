@@ -1,7 +1,7 @@
 services:
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: factory-mosquitto
+    container_name: mosquitto
     ports:
       - "1883:1883"
       - "9001:9001"
@@ -16,7 +16,7 @@ services:
 
   nodered:
     image: nodered/node-red:latest
-    container_name: factory-nodered
+    container_name: nodered
     ports:
       - "1880:1880"
     volumes:

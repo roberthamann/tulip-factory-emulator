@@ -1,6 +1,6 @@
-# Tulip Factory Emulator
+# ACME Factory Simulation
 
-A hybrid AI-dynamic manufacturing plant simulator that exposes real industrial protocols (OPC UA, MQTT), serves a live factory floor dashboard, and uses a local LLM (Ollama) for both an in-dashboard chat panel and an autonomous AI brain loop that drives realistic factory behavior.
+A hybrid manufacturing plant simulator that exposes real industrial protocols (OPC UA, MQTT), serves a live factory floor dashboard, and integrates with Tulip via an OPC UA bridge and Node-RED flows.
 
 ---
 
@@ -15,7 +15,7 @@ A hybrid AI-dynamic manufacturing plant simulator that exposes real industrial p
 
 ## Overview
 
-The Tulip Factory Emulator simulates a three-line manufacturing plant with 13 machines across precision machining, heavy fabrication, and CNC assembly lines. It is designed to be a realistic integration target for industrial dashboards, SCADA systems, and IoT platforms.
+ACME Factory Simulation simulates a three-line manufacturing plant with 13 machines across precision machining, heavy fabrication, and CNC assembly lines. It is designed to be a realistic integration target for industrial dashboards, SCADA systems, and IoT platforms.
 
 ### Architecture
 
@@ -23,17 +23,16 @@ The Tulip Factory Emulator simulates a three-line manufacturing plant with 13 ma
 ┌─────────────────────────────────────────────────────────┐
 │                     main.py (entry point)               │
 ├────────────┬──────────────┬──────────────┬──────────────┤
-│  FastAPI   │  OPC UA      │  MQTT        │  AI Brain    │
-│  Dashboard │  Server      │  Publisher   │  (Ollama)    │
-│  :3000     │  :4840       │  :1883       │  :11434      │
+│  FastAPI   │  OPC UA      │  MQTT        │  Edge IO     │
+│  Dashboard │  Server      │  Publisher   │  Device      │
+│  :3000     │  :4840       │  :1883       │  EIO-01      │
 └────────────┴──────────────┴──────────────┴──────────────┘
-                        │
-              ┌─────────▼──────────┐
-              │   Plant Simulation  │
-              │  sim/plant.py       │
-              │  13 machines, 3     │
-              │  production lines   │
-              └────────────────────┘
+                   │                │
+        ┌──────────▼──────┐  ┌──────▼───────┐
+        │  OPC UA Bridge  │  │  Node-RED    │
+        │  opcua-bridge/  │  │  :1880       │
+        │  :4841 (Tulip)  │  │  (Docker)    │
+        └─────────────────┘  └──────────────┘
 ```
 
 ### Production Lines
@@ -46,12 +45,13 @@ The Tulip Factory Emulator simulates a three-line manufacturing plant with 13 ma
 
 ### Key Ports
 
-| Service    | Port  | Protocol         |
-|------------|-------|------------------|
-| Dashboard  | 3000  | HTTP + WebSocket |
-| OPC UA     | 4840  | opc.tcp          |
-| MQTT Broker| 1883  | mqtt             |
-| Ollama LLM | 11434 | HTTP             |
+| Service          | Port  | Protocol         |
+|------------------|-------|------------------|
+| Dashboard        | 3000  | HTTP + WebSocket |
+| OPC UA (sim)     | 4840  | opc.tcp          |
+| OPC UA (bridge)  | 4841  | opc.tcp          |
+| MQTT Broker      | 1883  | mqtt             |
+| Node-RED         | 1880  | HTTP             |
 
 ---
 
@@ -59,66 +59,56 @@ The Tulip Factory Emulator simulates a three-line manufacturing plant with 13 ma
 
 ### Prerequisites
 
-- Python 3.10+
-- Docker & Docker Compose
-- [Ollama](https://ollama.com/) with a model pulled (e.g. `llama3`)
+- Python 3.11+
+- Node.js 18+
+- Docker (Docker Desktop or Colima on macOS)
 
 ### Steps
 
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/roberthamann/tulip-factory-emulator.git
-cd tulip-factory-emulator
+git clone <repo-url>
+cd factory-hybrid
 ```
 
-**2. Create and activate a Python virtual environment**
+**2. Create a Python virtual environment and install dependencies**
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate        # macOS/Linux
-# venv\Scripts\activate         # Windows
-```
-
-**3. Install Python dependencies**
-
-```bash
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**4. Pull an Ollama model**
+**3. Install Node.js dependencies for the OPC UA bridge**
 
 ```bash
-ollama pull llama3
+cd opcua-bridge && npm install && cd ..
 ```
 
-**5. Start the MQTT broker**
+**4. Start everything**
 
 ```bash
-docker-compose up -d mosquitto
+./start.sh
 ```
 
-**6. Start Ollama** (separate terminal)
+`start.sh` will start Mosquitto and Node-RED via Docker, launch the OPC UA bridge, and
+start the Python simulation with watchdog auto-restart. The dashboard will be available
+at **http://localhost:3000**.
+
+To stop all services:
 
 ```bash
-ollama serve
+pkill -f main.py && docker stop mosquitto nodered
 ```
-
-**7. Start the simulation**
-
-```bash
-python main.py
-```
-
-The dashboard will be available at **http://localhost:3000**.
 
 ### Restart Policy
 
-| Change made                          | Action required                     |
-|--------------------------------------|-------------------------------------|
-| Any `.py` file                       | `Ctrl+C` → `python main.py`        |
+| Change made                          | Action required     |
+|--------------------------------------|---------------------|
+| Any `.py` file                       | Re-run `./start.sh` |
 | `dashboard/static/index.html`        | Hard-refresh browser (`Ctrl+Shift+R`) |
-| `config/plant_config.yaml`           | `Ctrl+C` → `python main.py`        |
+| `config/plant_config.yaml`           | Re-run `./start.sh` |
 
 ---
 
@@ -220,9 +210,9 @@ factory/alerts/{line_id}/{machine_id}      — fault events (QoS 2)
 factory/summary                            — plant-level summary
 ```
 
-### AI Brain
+### Edge IO Device
 
-`sim/ai_brain.py` runs an autonomous loop every 45 seconds. It sends a plant state summary to Ollama, which returns a JSON array of commands that are executed directly on the plant — simulating an AI operator making decisions. If Ollama is unavailable or returns malformed JSON, the cycle is skipped gracefully.
+`sim/edge_io.py` simulates an industrial edge I/O device (`EIO-01`) linked to the first machine on Line 1. It exposes 8 GPIO channels, analog inputs/outputs, a light kit, and a serial barcode scanner — all updated every simulation tick based on the linked machine's state. Accessible via the dashboard.
 
 ### Machine Simulation
 
@@ -242,23 +232,27 @@ Machine-specific behavior is defined in `sim/machines/types.py` for: Mill, Lathe
 factory-hybrid/
 ├── main.py                        Entry point
 ├── requirements.txt               Python dependencies
-├── docker-compose.yml             Mosquitto MQTT broker
+├── start.sh                       One-command startup script (with watchdog)
+├── docker-compose.yml             Mosquitto + Node-RED (alternative to start.sh)
 ├── mosquitto.conf                 MQTT broker config
 ├── config/
 │   └── plant_config.yaml          Plant layout (lines, machines, ports)
 ├── sim/
 │   ├── plant.py                   Plant + ProductionLine + tick loop
-│   ├── opcua_server.py            OPC UA server (asyncua)
-│   ├── mqtt_publisher.py          MQTT publisher (aiomqtt)
-│   ├── ai_brain.py                Autonomous Ollama AI loop
-│   ├── edge_io.py                 Edge I/O device simulation
+│   ├── opcua_server.py            OPC UA server (asyncua, :4840)
+│   ├── mqtt_publisher.py          MQTT publisher (aiomqtt, :1883)
+│   ├── edge_io.py                 Edge I/O device simulation (EIO-01)
 │   └── machines/
 │       ├── base.py                BaseMachine, MachineState, fault library
 │       └── types.py               Machine type implementations
-└── dashboard/
-    ├── server.py                  FastAPI app (REST, WebSocket, commands)
-    └── static/
-        └── index.html             Dashboard UI
+├── dashboard/
+│   ├── server.py                  FastAPI app (REST, WebSocket, commands)
+│   └── static/
+│       └── index.html             Dashboard UI
+├── opcua-bridge/
+│   └── bridge.js                  Node.js OPC UA bridge (:4840 → :4841)
+└── nodered/
+    └── flows.json                 Node-RED flow definitions
 ```
 
 ---
@@ -277,9 +271,9 @@ factory-hybrid/
 MQTTConnectError: Connection refused
 ```
 
-- Ensure the Mosquitto container is running: `docker-compose ps`
-- If it exited, check logs: `docker-compose logs mosquitto`
-- Restart it: `docker-compose up -d mosquitto`
+- Ensure the Mosquitto container is running: `docker ps | grep mosquitto`
+- If it exited, restart it: `docker start mosquitto`
+- Check logs: `docker logs mosquitto`
 
 ### OPC UA server fails to start
 
@@ -290,23 +284,33 @@ OSError: [Errno 48] Address already in use
 - Another process is using port 4840. Find and stop it: `lsof -i :4840`
 - Or change the port in `config/plant_config.yaml` under `opcua.endpoint`.
 
-### AI Brain not responding / chat panel silent
+### OPC UA bridge not starting
 
-- Verify Ollama is running: `ollama list` should return at least one model.
-- Start it if needed: `ollama serve`
-- Confirm a model is available: `ollama pull llama3`
-- Check the terminal output — if Ollama returns bad JSON, the brain logs a warning and skips the cycle. This is expected behavior.
+- Confirm Node.js >=18 is installed: `node --version`
+- Ensure dependencies are installed: `cd opcua-bridge && npm install`
+- Check logs: `tail -f logs/opcua-bridge.log`
 
 ### `ModuleNotFoundError` on startup
 
 - Ensure the virtual environment is activated: `source venv/bin/activate`
 - Reinstall dependencies: `pip install -r requirements.txt`
 
+### Services keep restarting in a loop
+
+`start.sh` includes watchdog processes that auto-restart crashed services. If you see
+repeated restart messages, check the logs for the root cause:
+
+```bash
+tail -f logs/factory-sim.log
+tail -f logs/opcua-bridge.log
+```
+
 ### Port conflicts summary
 
-| Port | Service    | Fix                                    |
-|------|------------|----------------------------------------|
-| 3000 | Dashboard  | `lsof -i :3000` → kill the process    |
-| 4840 | OPC UA     | `lsof -i :4840` → kill the process    |
-| 1883 | MQTT       | `docker-compose restart mosquitto`     |
-| 11434| Ollama     | `ollama serve` to start                |
+| Port | Service        | Fix                                          |
+|------|----------------|----------------------------------------------|
+| 3000 | Dashboard      | `lsof -i :3000` → kill the process          |
+| 4840 | OPC UA (sim)   | `lsof -i :4840` → kill the process          |
+| 4841 | OPC UA (bridge)| `lsof -i :4841` → kill the process          |
+| 1883 | MQTT           | `docker restart mosquitto`                   |
+| 1880 | Node-RED       | `docker restart nodered`                     |

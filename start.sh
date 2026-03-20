@@ -47,11 +47,16 @@ for pkg in asyncua aiohttp fastapi uvicorn websockets paho.mqtt; do
   fi
 done
 
-# Node.js
+# Node.js (>=18 required by node-opcua)
 if ! command -v node &>/dev/null; then
   echo -e "${RED}  ✗ node not found${NC}"; FAIL=1
 else
-  echo -e "${GREEN}  ✓ node $(node --version)${NC}"
+  NODE_VER=$(node --version | tr -d 'v' | cut -d. -f1)
+  if [ "$NODE_VER" -lt 18 ]; then
+    echo -e "${RED}  ✗ node $(node --version) — need >=18${NC}"; FAIL=1
+  else
+    echo -e "${GREEN}  ✓ node $(node --version)${NC}"
+  fi
 fi
 
 # Node dependencies (for OPC UA bridge)
@@ -97,15 +102,26 @@ echo -e "${GREEN}▸ All preflight checks passed!${NC}\n"
 #  CLEANUP — kill previous instances
 # ─────────────────────────────────────────────────────────────────
 echo -e "${YELLOW}▸ Cleaning up previous instances...${NC}"
+mkdir -p logs
+# Kill watchdog loops from previous start.sh run before killing the processes they watch
+if [ -f logs/watchdog.pids ]; then
+  while read -r wpid; do
+    kill "$wpid" 2>/dev/null || true
+  done < logs/watchdog.pids
+  rm -f logs/watchdog.pids
+fi
 pkill -f "python3.*main.py" 2>/dev/null || true
 pkill -f "Python.*main.py" 2>/dev/null || true
 pkill -f "node.*bridge" 2>/dev/null || true
-sleep 1
+# Also free ports in case processes didn't die cleanly
+lsof -ti :4840 2>/dev/null | xargs kill -9 2>/dev/null || true
+lsof -ti :3000 2>/dev/null | xargs kill -9 2>/dev/null || true
+sleep 2
 
 # ─────────────────────────────────────────────────────────────────
 #  1. MOSQUITTO (MQTT Broker)
 # ─────────────────────────────────────────────────────────────────
-echo -e "${CYAN}▸ [1/5] Mosquitto MQTT Broker${NC}"
+echo -e "${CYAN}▸ [1/4] Mosquitto MQTT Broker${NC}"
 if docker ps --format '{{.Names}}' | grep -q '^mosquitto$'; then
   echo -e "${GREEN}  ✓ Already running${NC}"
 elif docker ps -a --format '{{.Names}}' | grep -q '^mosquitto$'; then
@@ -117,15 +133,15 @@ else
     --name mosquitto \
     -p 1883:1883 \
     -p 9001:9001 \
-    eclipse-mosquitto:2 \
-    mosquitto -c /mosquitto-no-auth.conf
+    -v "$DIR/mosquitto.conf:/mosquitto/config/mosquitto.conf" \
+    eclipse-mosquitto:2
   echo -e "${GREEN}  ✓ Started on :1883${NC}"
 fi
 
 # ─────────────────────────────────────────────────────────────────
 #  2. NODE-RED
 # ─────────────────────────────────────────────────────────────────
-echo -e "${CYAN}▸ [2/5] Node-RED${NC}"
+echo -e "${CYAN}▸ [2/4] Node-RED${NC}"
 if docker ps --format '{{.Names}}' | grep -q '^nodered$'; then
   echo -e "${GREEN}  ✓ Already running${NC}"
 elif docker ps -a --format '{{.Names}}' | grep -q '^nodered$'; then
@@ -145,7 +161,7 @@ fi
 # ─────────────────────────────────────────────────────────────────
 #  3. TULIP CONNECTOR HOST
 # ─────────────────────────────────────────────────────────────────
-echo -e "${CYAN}▸ [3/4] Tulip Connector Host (ROBERTHAMANN-CH)${NC}"
+echo -e "${CYAN}▸ [3/4] Tulip Connector Host${NC}"
 if docker ps --format '{{.Names}}' | grep -qi 'connector\|tulip'; then
   echo -e "${GREEN}  ✓ Already running${NC}"
 else
@@ -184,6 +200,7 @@ if [ -d "opcua-bridge" ]; then
       fi
     done
   ) &
+  echo $! >> logs/watchdog.pids
 else
   echo -e "${YELLOW}  ⚠ opcua-bridge/ not found — skipping Node.js bridge${NC}"
 fi
@@ -199,6 +216,10 @@ echo -e "${GREEN}  ✓ Factory sim PID $SIM_PID${NC}"
     sleep 15
     if ! kill -0 "$SIM_PID" 2>/dev/null; then
       echo "$(date '+%Y-%m-%d %H:%M:%S') [watchdog] Factory sim exited — restarting..." | tee -a logs/factory-sim.log
+      # Free ports that may still be bound from the previous run
+      lsof -ti :4840 2>/dev/null | xargs kill -9 2>/dev/null || true
+      lsof -ti :3000 2>/dev/null | xargs kill -9 2>/dev/null || true
+      sleep 1
       cd "$DIR"
       nohup venv/bin/python3 main.py >> logs/factory-sim.log 2>&1 &
       SIM_PID=$!
@@ -206,6 +227,7 @@ echo -e "${GREEN}  ✓ Factory sim PID $SIM_PID${NC}"
     fi
   done
 ) &
+echo $! >> logs/watchdog.pids
 
 # ─────────────────────────────────────────────────────────────────
 #  WAIT FOR SERVICES

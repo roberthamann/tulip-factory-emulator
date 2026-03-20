@@ -8,21 +8,23 @@ realistic factory behavior.
 
 ## How to Run
 ```bash
-# 1. Start MQTT broker
-docker-compose up -d mosquitto
+./start.sh
+```
 
-# 2. Start local LLM (separate terminal)
-ollama serve
+`start.sh` handles everything: starts Mosquitto (Docker) and Node-RED (Docker), launches the
+OPC UA bridge (Node.js), and starts the Python factory sim with watchdog auto-restart.
+Watchdog PIDs are saved to `logs/watchdog.pids` so re-running `./start.sh` cleanly stops
+the previous session first.
 
-# 3. Activate venv and start the backend
-source venv/bin/activate
-python main.py
+To stop all services:
+```bash
+pkill -f main.py && docker stop mosquitto nodered
 ```
 
 ## Restart Policy
-- After editing any .py file → Ctrl+C then `python main.py`
+- After editing any .py file → Ctrl+C on the terminal running `./start.sh`, then `./start.sh`
 - After editing dashboard/static/index.html → hard-refresh browser (Ctrl+Shift+R)
-- After editing config/plant_config.yaml → Ctrl+C then `python main.py`
+- After editing config/plant_config.yaml → restart with `./start.sh`
 
 ## File Map
 ```
@@ -38,23 +40,26 @@ factory-hybrid/
 │   ├── plant.py                   Plant + ProductionLine classes, tick loop
 │   ├── opcua_server.py            OPC UA server (asyncua, port 4840)
 │   ├── mqtt_publisher.py          MQTT publisher (aiomqtt, port 1883)
-│   ├── ai_brain.py                Autonomous Ollama AI loop (every 45s)
+│   ├── edge_io.py                 Edge I/O device simulation (GPIO, analog, scanner)
 │   └── machines/
 │       ├── base.py                BaseMachine, MachineState enum, fault library
 │       └── types.py               Mill, Lathe, Grinder, Press, Drill, CNC, Conveyor
-└── dashboard/
-    ├── server.py                  FastAPI: WebSocket, REST API, /api/command
-    └── static/
-        └── index.html             Full dashboard UI (HTML/CSS/JS, no framework)
+├── dashboard/
+│   ├── server.py                  FastAPI: WebSocket, REST API, /api/command
+│   └── static/
+│       └── index.html             Full dashboard UI (HTML/CSS/JS, no framework)
+└── opcua-bridge/
+    └── bridge.js                  Node.js OPC UA bridge (:4840 → :4841 for Tulip)
 ```
 
 ## Key Ports
-| Service    | Port  | Protocol        |
-|------------|-------|-----------------|
-| Dashboard  | 3000  | HTTP + WebSocket |
-| OPC UA     | 4840  | opc.tcp         |
-| MQTT       | 1883  | mqtt            |
-| Ollama     | 11434 | HTTP            |
+| Service       | Port  | Protocol        |
+|---------------|-------|-----------------|
+| Dashboard     | 3000  | HTTP + WebSocket |
+| OPC UA (sim)  | 4840  | opc.tcp         |
+| OPC UA (bridge)| 4841 | opc.tcp         |
+| MQTT          | 1883  | mqtt            |
+| Node-RED      | 1880  | HTTP            |
 
 ## API Endpoints
 ```
@@ -140,11 +145,11 @@ Server pushes JSON every tick:
 }
 ```
 
-## AI Brain (sim/ai_brain.py)
-Calls Ollama every 45 seconds with a plant state summary.
-Ollama returns a JSON array of commands which are executed directly on the plant.
-If Ollama is slow or returns bad JSON, the cycle is skipped gracefully.
-Interval is configurable: `AIBrain(plant, interval=45)`
+## Edge IO Device (sim/edge_io.py)
+`EIO-01` is a simulated edge I/O device linked to the first machine on Line 1 (MILL-L1-01).
+It exposes 8 GPIO channels, analog I/O, a light kit, and a serial scanner — all updated
+every tick based on the linked machine's state. Accessible via `/api/edge` on the dashboard.
+To change which machine it links to, edit `main.py` line 26–27.
 
 ## Common Tasks for Claude Code
 - "Add a new production line" → edit plant_config.yaml + types.py if new machine type needed
